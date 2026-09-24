@@ -78,8 +78,22 @@ func _spawn_town() -> void:
 	boris.identity.npc_name = "Борис"
 	boris.identity.traits = PackedStringArray(["ворчливый"])
 	boris.schedule.add_slot(9, "мастерская", "чинит вещи")
+	boris.schedule.add_slot(19, "таверна", "читает газету")
 	add_child(boris)
 	npcs.append(boris)
+	var luka := NPC.new()
+	luka.identity.npc_name = "Лука"
+	luka.identity.traits = PackedStringArray(["мечтательный", "тихий"])
+	luka.schedule.add_slot(10, "причал", "ловит рыбу")
+	add_child(luka)
+	npcs.append(luka)
+	var anya := NPC.new()
+	anya.identity.npc_name = "Аня"
+	anya.identity.traits = PackedStringArray(["энергичная", "любопытная"])
+	anya.schedule.add_slot(7, "рынок", "торгует цветами")
+	anya.schedule.add_slot(20, "площадь", "танцует")
+	add_child(anya)
+	npcs.append(anya)
 
 func _intro() -> void:
 	if player_name == "":
@@ -102,10 +116,21 @@ func _on_talk() -> void:
 	if npcs.is_empty():
 		return
 	var npc := _npc_at_hour(clock.hour())
-	_log("%s: %s" % [npc.identity.npc_name, npc.greet(clock.day)])
-	if npcs.size() >= 2:
-		var other: NPC = npcs[1] if npc == npcs[0] else npcs[0]
+	var spot := npc.schedule.place_at(clock.hour())
+	_log("%s (%s): %s" % [npc.identity.npc_name, spot["place"], npc.greet(clock.day)])
+	var others := _others_at(npc, spot["place"])
+	if others.size() > 0:
+		var other: NPC = others[0]
+		if npc.identity.relationships.get(other.identity.npc_name, 0.0) > 0.5:
+			_log("%s дружелюбно встречает %s." % [npc.identity.npc_name, other.identity.npc_name])
 		_log(npc.gossip_with(other, clock.day))
+
+func _others_at(npc: NPC, place: String) -> Array[NPC]:
+	var out: Array[NPC] = []
+	for other in npcs:
+		if other != npc and other.schedule.place_at(clock.hour())["place"] == place:
+			out.append(other)
+	return out
 
 func _npc_at_hour(hour: int) -> NPC:
 	for npc in npcs:

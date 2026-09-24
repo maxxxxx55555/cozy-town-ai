@@ -11,3 +11,8 @@ build/
 data_*/
 secrets.local.md
 tpl.tpz
+probe.log
+probe.err
+range_test.bin
+tpl_parts/
+tpl_partial.bak

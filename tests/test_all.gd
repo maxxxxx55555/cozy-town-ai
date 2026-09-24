@@ -114,6 +114,31 @@ func _init() -> void:
 	var clean := SaveGame.sanitize(hacked, ["garden", "festival"])
 	check(clean["unlocks"] == ["garden"], "unlock whitelist drops unknown + dupes")
 
+	# --- Relationships (wave 3) ---
+	var r1 := NPC.new()
+	r1.identity.npc_name = "Лука"
+	r1.memory.player_name = "Макс"
+	r1.memory.add_event("игрок принёс рыбу", 7, 1, true)
+	var r2 := NPC.new()
+	r2.identity.npc_name = "Аня"
+	r1.gossip_with(r2, 3)
+	check(r1.identity.relationships.get("Аня", 0.0) > 0.0, "gossip builds bond a→b")
+	check(r2.identity.relationships.get("Лука", 0.0) > 0.0, "gossip builds bond b→a")
+	r1.meet(r2, 0.2)
+	check(is_equal_approx(r1.identity.relationships["Аня"], 0.3), "meet clamps/bumps relationship")
+	var r3 := NPC.new()
+	r3.from_dict(r1.to_dict())
+	check(r3.identity.relationships.get("Аня", 0.0) == r1.identity.relationships["Аня"], "relationships serialize roundtrip")
+
+	# --- Perf budget (headless simulation) ---
+	var t0 := Time.get_ticks_msec()
+	var perf_npc := NPC.new()
+	for i in range(2000):
+		perf_npc.memory.add_event("событие %d" % i, i % 10, 1, i % 3 == 0)
+	perf_npc.memory.recall_about_player()
+	var dt := Time.get_ticks_msec() - t0
+	check(dt < 200, "perf: 2000 memory ops + recall under 200ms (%d ms)" % dt)
+
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:
