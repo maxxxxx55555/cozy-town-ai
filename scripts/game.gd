@@ -32,6 +32,8 @@ func _process(delta: float) -> void:
 	autosave_time += delta
 	clock.advance(delta)
 	time_label.text = clock.time_string()
+	for npc in npcs:
+		npc.tick(clock.hour())
 	if not recall_shown and session_time >= RECALL_DELAY_SEC:
 		_show_recall()
 	if autosave_time >= AUTOSAVE_SEC:
@@ -47,26 +49,32 @@ func _build_ui() -> void:
 	vb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 	add_child(vb)
 	time_label = Label.new()
+	time_label.name = "TimeLabel"
 	vb.add_child(time_label)
 	log_label = RichTextLabel.new()
+	log_label.name = "LogLabel"
 	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_label.bbcode_enabled = true
 	vb.add_child(log_label)
 	var hb := HBoxContainer.new()
 	vb.add_child(hb)
 	name_input = LineEdit.new()
+	name_input.name = "NameInput"
 	name_input.placeholder_text = "Твоё имя…"
 	name_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(name_input)
 	name_button = Button.new()
+	name_button.name = "NameButton"
 	name_button.text = "Представиться"
 	name_button.pressed.connect(_on_name_submitted)
 	hb.add_child(name_button)
 	talk_button = Button.new()
+	talk_button.name = "TalkButton"
 	talk_button.text = "Поговорить"
 	talk_button.pressed.connect(_on_talk)
 	hb.add_child(talk_button)
 	report_button = Button.new()
+	report_button.name = "ReportButton"
 	report_button.text = "Сообщить"
 	report_button.pressed.connect(_on_report)
 	hb.add_child(report_button)

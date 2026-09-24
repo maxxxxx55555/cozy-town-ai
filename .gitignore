@@ -16,3 +16,12 @@ probe.err
 range_test.bin
 tpl_parts/
 tpl_partial.bak
+u.txt
+ue.txt
+i.txt
+ie.txt
+t.txt
+te.txt
+s.txt
+se.txt
+probe*.log

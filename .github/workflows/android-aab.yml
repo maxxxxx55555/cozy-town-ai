@@ -47,7 +47,7 @@ jobs:
           sed -i "s|keystore/release_password=\"\"|keystore/release_password=\"$KEYSTORE_PASS\"|" export_presets.cfg
 
       - name: Headless tests
-        run: godot --headless --path . --import && godot --headless --path . -s tests/test_all.gd
+        run: godot --headless --path . --import && godot --headless --path . -s tests/test_all.gd && godot --headless --path . -s tests/test_integration.gd
 
       - name: Export AAB
         run: |

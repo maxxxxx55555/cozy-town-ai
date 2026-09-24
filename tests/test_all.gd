@@ -163,6 +163,18 @@ func _init() -> void:
 	check(not ReportService.submit("bug", "   ", {}), "report rejects empty text")
 	check(not ReportService.submit("bug", "a".repeat(1001), {}), "report rejects oversized text")
 
+	# --- Mood by day context (wave 5) ---
+	var mt := NPC.new()
+	mt.identity.npc_name = "Марта"
+	mt.schedule.add_slot(8, "пекарня", "печёт хлеб")
+	mt.tick(9)
+	check(mt.identity.mood == "happy", "baker happy in morning")
+	mt.tick(23)
+	check(mt.identity.mood == "sleepy", "everyone sleepy at night")
+	mt.identity.apply_karma(-10)
+	mt.tick(9)
+	check(mt.identity.mood == "angry", "anger not erased by time")
+
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:

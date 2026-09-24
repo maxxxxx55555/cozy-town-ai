@@ -33,6 +33,18 @@ func react_to_action(action_text: String, karma: int, day: int) -> String:
 		_:
 			return "Понял(а)."
 
+func tick(hour: int) -> void:
+	# Эмоции зависят от контекста дня; сильные эмоции (злость) не стираются временем.
+	var spot := schedule.place_at(hour)
+	if identity.mood == "angry":
+		return
+	if hour >= 22:
+		identity.mood = "sleepy" # все расходятся по домам
+	elif hour == 14:
+		identity.mood = "neutral"
+	elif spot["activity"] == "печёт хлеб" and hour >= 8 and hour < 12:
+		identity.mood = "happy"
+
 func meet(other: NPC, warmth := 0.2) -> void:
 	var cur := float(identity.relationships.get(other.identity.npc_name, 0.0))
 	identity.relationships[other.identity.npc_name] = clampf(cur + warmth, -1.0, 1.0)
