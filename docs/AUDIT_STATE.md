@@ -1,19 +1,18 @@
 ﻿# AUDIT_STATE — «Пазл из Жизни»
-Волна: 1 | Score начало: 0% → конец: **70%** (7/10)
+Волна: 2 | Score: 0% → 70% (w1) → **80%** (8/10)
 
 ## GAP-матрица
 1. GDD/TZ — ✅
-2. Godot project.godot + main scene — ✅
+2. project.godot + main scene — ✅
 3. NPC: память/характер/эмоции — ✅
-4. NPC: расписание/отношения/сплетни — ✅
-5. Save: JSON+checksum, anti-tamper — ✅
-6. Тесты headless (14/14 pass, exit 0) — ✅
+4. NPC: расписание/отношения/сплетни — ✅ (+gossip propagation w2)
+5. Save: JSON+checksum, anti-tamper — ✅ (+unlock whitelist, inventory guard w2)
+6. Тесты headless — ✅ 24/24 pass, exit 0 (w2)
 7. Android preset: API 36, AAB, custom build, arm64+v7a — ✅
-8. Android build template + keystore + AAB — ⚠️ keystore создан (release.keystore, пароль в secrets.local.md, не в git); шаблоны ~1.1ГБ, сеть ~13КБ/с → BLOCKER
-9. Play: signing, AI-decl, DataSafety, listing — ❌ (Console, вне репо)
-10. ASO: иконка/скриншоты/описание — ❌
+8. Build template + keystore + AAB — ⚠️ keystore ✅; шаблоны качаются (3.3/1100 МБ, ~13КБ/с) → BLOCKER
+9. Play Console: signing, AI-decl, DataSafety, listing — ❌ (вне репо, ручной шаг)
+10. ASO: описание + иконка + feature + 6 скриншотов — ✅ черновики (docs/ASO.md, assets/store/)
 
-## Волна 2 (приоритет)
-- Скачать export templates (быстрый канал) → Install Android Build Template → AAB → keystore в preset.
-- UI: ввод имени игрока (хук 0:30), recall-попап (5:00).
-- ASO: черновик иконки + описание.
+## Волна 3 (приоритет)
+- Докачать шаблоны → Install Android Build Template → прописать keystore → AAB.
+- Perf-профиль на mid-range, больше NPC/мест, монетизация-дизайн.

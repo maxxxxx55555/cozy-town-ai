@@ -79,6 +79,41 @@ func _init() -> void:
 	n2.from_dict(n1.to_dict())
 	check(n2.memory.player_name == "Макс" and n2.identity.trust == 0.5, "npc serialize roundtrip")
 
+	# --- GameClock ---
+	var gc := GameClock.new()
+	check(gc.hour() == 8, "clock starts 08:00")
+	gc.advance(60 * 17) # +17ч → следующий день 01:00
+	check(gc.day == 2 and gc.hour() == 1, "clock rolls past midnight")
+	var gc2 := GameClock.new()
+	gc2.from_dict(gc.to_dict())
+	check(gc2.day == 2 and gc2.total_minutes == gc.total_minutes, "clock serialize roundtrip")
+
+	# --- Inventory anti-cheat ---
+	var inv := Inventory.new()
+	inv.add_item("apple", 3)
+	check(inv.count("apple") == 3, "inventory add")
+	check(not inv.add_item("apple", -5), "inventory rejects negative add")
+	check(not inv.remove_item("apple", 99), "inventory rejects over-remove")
+	inv.from_dict({"apple": 2, "hacked": -10, "junk": 0})
+	check(inv.count("apple") == 2 and inv.count("hacked") == 0 and inv.count("junk") == 0, "inventory from_dict drops non-positive")
+
+	# --- Gossip propagation ---
+	var g1 := NPC.new()
+	g1.identity.npc_name = "Марта"
+	g1.memory.player_name = "Макс"
+	g1.memory.add_event("игрок спас кота", 9, 1, true)
+	var g2 := NPC.new()
+	g2.identity.npc_name = "Борис"
+	g1.gossip_with(g2, 2)
+	var b_recall := g2.memory.recall_about_player()
+	check(b_recall.size() > 0 and b_recall[0]["text"] == "игрок спас кота", "gossip propagates memory to other npc")
+	check(b_recall[0]["importance"] == 8, "gossip weakens importance by 1")
+
+	# --- Unlock whitelist (bypass guard) ---
+	var hacked := {"unlocks": ["garden", "premium_hack", "garden"]}
+	var clean := SaveGame.sanitize(hacked, ["garden", "festival"])
+	check(clean["unlocks"] == ["garden"], "unlock whitelist drops unknown + dupes")
+
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:

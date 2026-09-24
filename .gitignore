@@ -10,3 +10,4 @@ build/
 .mono/
 data_*/
 secrets.local.md
+tpl.tpz

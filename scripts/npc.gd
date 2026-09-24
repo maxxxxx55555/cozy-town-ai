@@ -33,11 +33,14 @@ func react_to_action(action_text: String, karma: int, day: int) -> String:
 		_:
 			return "Понял(а)."
 
-func gossip_with(partner: NPC) -> String:
+func gossip_with(partner: NPC, day := 1) -> String:
 	var evs := memory.recall_about_player()
 	if evs.is_empty():
 		return "%s и %s молча кивают друг другу." % [identity.npc_name, partner.identity.npc_name]
-	return Gossip.line(self, partner, evs[0]["text"])
+	var ev: Dictionary = evs[0]
+	# Сплетня распространяется: partner запоминает событие (слабее).
+	partner.memory.add_event(ev["text"], maxi(int(ev["importance"]) - 1, 1), day, ev["about_player"])
+	return Gossip.line(self, partner, ev["text"])
 
 func to_dict() -> Dictionary:
 	return {

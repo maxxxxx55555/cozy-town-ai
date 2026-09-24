@@ -14,7 +14,7 @@ static func save_state(state: Dictionary) -> bool:
 	f.close()
 	return true
 
-static func load_state() -> Dictionary:
+static func load_state(allowed_unlocks: Array = []) -> Dictionary:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return {}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -30,13 +30,20 @@ static func load_state() -> Dictionary:
 	var data = JSON.parse_string(payload["data"])
 	if typeof(data) != TYPE_DICTIONARY:
 		return {}
-	return sanitize(data)
+	return sanitize(data, allowed_unlocks)
 
-static func sanitize(data: Dictionary) -> Dictionary:
+static func sanitize(data: Dictionary, allowed_unlocks: Array = []) -> Dictionary:
 	if data.has("coins"):
 		var t := typeof(data["coins"])
 		if (t != TYPE_INT and t != TYPE_FLOAT) or float(data["coins"]) < 0.0:
 			data["coins"] = 0
+	if data.has("unlocks"):
+		var clean: Array = []
+		if typeof(data["unlocks"]) == TYPE_ARRAY and allowed_unlocks.size() > 0:
+			for u in data["unlocks"]:
+				if u in allowed_unlocks and not u in clean:
+					clean.append(u)
+		data["unlocks"] = clean
 	return data
 
 static func _checksum(s: String) -> String:
