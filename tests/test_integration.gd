@@ -87,6 +87,11 @@ func _initialize() -> void:
 	var coin_stream = (game.find_child("coin", true, false) as AudioStreamPlayer).stream
 	check(coin_stream != null, "coin sfx stream loaded")
 
+	# Журнал не растёт бесконечно (wave 10)
+	for i in range(400):
+		game._log("строка %d" % i)
+	check(game.log_lines <= game.MAX_LOG_LINES, "log journal capped")
+
 	game.queue_free()
 	game2.queue_free()
 	await process_frame

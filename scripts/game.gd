@@ -21,6 +21,8 @@ var coins_label: Label
 var help_button: Button
 var privacy_button: Button
 const TALK_COOLDOWN := 5.0 # анти-спам дневных целей
+const MAX_LOG_LINES := 300 # потолок журнала: долгая сессия не растёт в памяти
+var log_lines := 0
 var last_talk_time := -999.0
 var sfx := {}
 var time_label: Label
@@ -270,7 +272,11 @@ func _on_report() -> void:
 	_log("[color=#bb4444]Спасибо, жалоба сохранена (всего: %d).[/color]" % ReportService.count() if ok else "[color=#bb4444]Не удалось сохранить жалобу.[/color]")
 
 func _log(t: String) -> void:
+	if log_lines >= MAX_LOG_LINES:
+		log_label.text = ""
+		log_lines = 0
 	log_label.append_text(t + "\n")
+	log_lines += 1
 
 func _save() -> void:
 	var arr: Array = []
