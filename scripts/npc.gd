@@ -70,8 +70,14 @@ func to_dict() -> Dictionary:
 	}
 
 func from_dict(d: Dictionary) -> void:
-	identity.npc_name = d.get("npc_name", "")
-	identity.trust = d.get("trust", 0.0)
-	identity.mood = d.get("mood", "neutral")
-	identity.relationships = d.get("relationships", {}).duplicate()
+	identity.npc_name = str(d.get("npc_name", "")).left(SaveGame.MAX_NAME)
+	identity.trust = clampf(float(d.get("trust", 0.0)), -1.0, 1.0)
+	var moods := ["neutral", "happy", "angry", "sleepy"]
+	var m := str(d.get("mood", "neutral"))
+	identity.mood = m if m in moods else "neutral"
+	identity.relationships.clear()
+	for k in d.get("relationships", {}).keys():
+		var v = d["relationships"][k]
+		if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
+			identity.relationships[str(k).left(SaveGame.MAX_NAME)] = clampf(float(v), -1.0, 1.0)
 	memory.from_dict(d.get("memory", {}))

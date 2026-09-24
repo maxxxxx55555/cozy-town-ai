@@ -1,12 +1,15 @@
 class_name SaveGame
 extends RefCounted
-## Сейвы: JSON + SHA-256 checksum. Tampered-сейв отклоняется.
+## Сейвы: JSON + SHA-256 checksum. Tampered-сейв отклоняется, значения санируются.
 
 const SAVE_PATH := "user://save.json"
+const VERSION := 1
+const MAX_COINS := 999999
+const MAX_NAME := 24
 
 static func save_state(state: Dictionary) -> bool:
 	var data_json := JSON.stringify(state)
-	var payload := {"data": data_json, "checksum": _checksum(data_json)}
+	var payload := {"data": data_json, "checksum": _checksum(data_json), "version": VERSION}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		return false
@@ -37,6 +40,16 @@ static func sanitize(data: Dictionary, allowed_unlocks: Array = []) -> Dictionar
 		var t := typeof(data["coins"])
 		if (t != TYPE_INT and t != TYPE_FLOAT) or float(data["coins"]) < 0.0:
 			data["coins"] = 0
+		data["coins"] = mini(int(data["coins"]), MAX_COINS)
+	if data.has("player_name"):
+		var n := str(data["player_name"]).strip_edges()
+		n = n.replace("\n", "").replace("\r", "").replace("\t", "")
+		data["player_name"] = n.left(MAX_NAME)
+	if data.has("clock"):
+		var c: Dictionary = data["clock"]
+		c["day"] = clampi(int(c.get("day", 1)), 1, 9999)
+		c["total_minutes"] = clampi(int(c.get("total_minutes", 8 * 60)), 0, 24 * 60 * 365)
+		data["clock"] = c
 	if data.has("unlocks"):
 		var clean: Array = []
 		if typeof(data["unlocks"]) == TYPE_ARRAY and allowed_unlocks.size() > 0:

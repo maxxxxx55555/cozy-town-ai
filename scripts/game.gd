@@ -8,6 +8,7 @@ const ALLOWED_UNLOCKS: Array = ["garden", "festival", "workshop_plus"]
 var npcs: Array[NPC] = []
 var clock := GameClock.new()
 var inventory := Inventory.new()
+var ritual := DailyRitual.new()
 var player_name := ""
 var coins := 0
 var session_time := 0.0
@@ -16,6 +17,8 @@ var recall_shown := false
 
 var log_label: RichTextLabel
 var town_map: TownMap
+var coins_label: Label
+var help_button: Button
 var time_label: Label
 var name_input: LineEdit
 var name_button: Button
@@ -27,6 +30,9 @@ func _ready() -> void:
 	_spawn_town()
 	town_map.npcs = npcs
 	_load()
+	if ritual.reset_for_day(clock.day):
+		_log_ritual()
+	_update_coins()
 	_intro()
 
 func _process(delta: float) -> void:
@@ -38,6 +44,9 @@ func _process(delta: float) -> void:
 	town_map.queue_redraw()
 	for npc in npcs:
 		npc.tick(clock.hour())
+	if ritual.reset_for_day(clock.day):
+		_log("[b]День %d. Цели обновлены.[/b]" % clock.day)
+		_log_ritual()
 	if not recall_shown and session_time >= RECALL_DELAY_SEC:
 		_show_recall()
 	if autosave_time >= AUTOSAVE_SEC:
@@ -55,6 +64,9 @@ func _build_ui() -> void:
 	time_label = Label.new()
 	time_label.name = "TimeLabel"
 	vb.add_child(time_label)
+	coins_label = Label.new()
+	coins_label.name = "CoinsLabel"
+	vb.add_child(coins_label)
 	town_map = TownMap.new()
 	town_map.name = "TownMap"
 	town_map.custom_minimum_size = Vector2(0, 340)
@@ -86,12 +98,18 @@ func _build_ui() -> void:
 	report_button.text = "Сообщить"
 	report_button.pressed.connect(_on_report)
 	hb.add_child(report_button)
+	help_button = Button.new()
+	help_button.name = "HelpButton"
+	help_button.text = "Помочь"
+	help_button.pressed.connect(_on_help)
+	hb.add_child(help_button)
 
 func _spawn_town() -> void:
 	var marta := NPC.new()
 	marta.identity.npc_name = "Марта"
 	marta.identity.traits = PackedStringArray(["добрая", "болтливая"])
 	marta.schedule.add_slot(8, "пекарня", "печёт хлеб")
+	marta.schedule.add_slot(13, "рынок", "покупает цветы")
 	marta.schedule.add_slot(18, "площадь", "гуляет")
 	add_child(marta)
 	npcs.append(marta)
@@ -140,12 +158,39 @@ func _on_talk() -> void:
 	var spot := npc.schedule.place_at(clock.hour())
 	_log(DialogueComposer.compose(npc, clock.day, clock.hour()))
 	_log("%s (%s)" % [npc.identity.npc_name, spot["place"]])
+	ritual.record("talk")
 	var others := _others_at(npc, spot["place"])
 	if others.size() > 0:
 		var other: NPC = others[0]
 		if npc.identity.relationships.get(other.identity.npc_name, 0.0) > 0.5:
 			_log("%s дружелюбно встречает %s." % [npc.identity.npc_name, other.identity.npc_name])
 		_log(npc.gossip_with(other, clock.day))
+		ritual.record("gossip")
+	_after_event()
+
+func _on_help() -> void:
+	if npcs.is_empty():
+		return
+	var npc := _npc_at_hour(clock.hour())
+	_log("%s: %s" % [npc.identity.npc_name, npc.react_to_action("помог по хозяйству", 5, clock.day)])
+	ritual.record("kind")
+	_after_event()
+
+func _after_event() -> void:
+	_log_ritual()
+	var reward := ritual.claim()
+	if reward > 0:
+		coins += reward
+		_log("[b]Цели дня выполнены! +%d монет[/b]" % reward)
+		_save()
+	_update_coins()
+
+func _log_ritual() -> void:
+	for s in ritual.status():
+		_log(("☑ %s" % s["text"]) if s["done"] else ("☐ %s (%d/%d)" % [s["text"], s["current"], s["target"]]))
+
+func _update_coins() -> void:
+	coins_label.text = "Монеты: %d" % coins
 
 func _others_at(npc: NPC, place: String) -> Array[NPC]:
 	var out: Array[NPC] = []
@@ -182,6 +227,7 @@ func _save() -> void:
 	SaveGame.save_state({
 		"player_name": player_name, "coins": coins,
 		"clock": clock.to_dict(), "inventory": inventory.to_dict(),
+		"ritual": ritual.to_dict(),
 		"unlocks": [], "npcs": arr,
 	})
 
@@ -193,6 +239,7 @@ func _load() -> void:
 	coins = int(state.get("coins", 0))
 	clock.from_dict(state.get("clock", {}))
 	inventory.from_dict(state.get("inventory", {}))
+	ritual.from_dict(state.get("ritual", {}))
 	var saved: Array = state.get("npcs", [])
 	for i in mini(saved.size(), npcs.size()):
 		npcs[i].from_dict(saved[i])

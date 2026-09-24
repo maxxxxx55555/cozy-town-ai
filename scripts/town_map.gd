@@ -25,9 +25,15 @@ func pos_for(npc: NPC, at_hour: int) -> Vector2:
 
 func _draw() -> void:
 	var font := ThemeDB.fallback_font
+	draw_rect(Rect2(Vector2.ZERO, size), Color("#8fbf6f")) # трава
+	draw_rect(Rect2(Vector2(0, size.y - 70), Vector2(size.x, 70)), Color("#6fa8d8")) # река
+	for a in PLACES.keys():
+		for b in PLACES.keys():
+			if a < b:
+				draw_line(PLACES[a], PLACES[b], Color(0.6, 0.55, 0.45, 0.25), 6.0)
 	for place in PLACES.keys():
 		draw_circle(PLACES[place], 6.0, Color(0.45, 0.35, 0.25, 0.6))
-		draw_string(font, PLACES[place] + Vector2(8, 4), place, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#5a4a3a"))
+		draw_string(font, PLACES[place] + Vector2(8, 4), place, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#3a2f24"))
 	for npc in npcs:
 		var p := pos_for(npc, hour)
 		var col: Color = MOOD_COLORS.get(npc.identity.mood, MOOD_COLORS["neutral"])

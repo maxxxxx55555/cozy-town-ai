@@ -208,6 +208,71 @@ func _init() -> void:
 	check(LLMDialogue.filter_output("y".repeat(500)).length() == LLMDialogue.MAX_OUTPUT, "llm output capped")
 	check(not "\n\n" in LLMDialogue.filter_output("a\n\n\nb"), "llm output collapses newlines")
 
+	# --- DailyRitual (wave 7) ---
+	var dr := DailyRitual.new()
+	check(dr.reset_for_day(1), "ritual inits for day 1")
+	check(not dr.reset_for_day(1), "ritual no reset same day")
+	check(dr.status().size() == 3, "ritual has 3 goals")
+	dr.record("talk")
+	dr.record("talk")
+	dr.record("kind")
+	dr.record("gossip")
+	check(dr.all_done(), "ritual all done")
+	check(dr.claim() == DailyRitual.REWARD, "ritual reward granted")
+	check(dr.claim() == 0, "ritual reward only once")
+	var dr2 := DailyRitual.new()
+	dr2.from_dict({"day": 1, "progress": {"talk": 5, "hack": 99, "kind": -3}, "claimed": false})
+	check(dr2.status().size() == 3 and dr2.claim() == 0, "ritual ignores unknown/negative progress")
+	dr2.reset_for_day(2)
+	check(not dr2.all_done(), "ritual resets next day")
+	var dr3 := DailyRitual.new()
+	dr3.from_dict(dr.to_dict())
+	check(dr3.day == 1 and dr3.claimed, "ritual serialize roundtrip")
+
+	# --- Save hardening / red team (wave 7) ---
+	var hacked2 := {"coins": 10 ** 9, "player_name": "x".repeat(50) + "\n", "clock": {"day": -3, "total_minutes": -99}}
+	var clean2 := SaveGame.sanitize(hacked2)
+	check(clean2["coins"] == SaveGame.MAX_COINS, "coins capped at max")
+	check((clean2["player_name"] as String).length() == SaveGame.MAX_NAME and "\n" not in clean2["player_name"], "player_name sanitized/capped")
+	check(clean2["clock"]["day"] == 1 and clean2["clock"]["total_minutes"] == 0, "clock clamped")
+	var evil_npc := NPC.new()
+	evil_npc.from_dict({"npc_name": "z".repeat(40), "trust": 99.0, "mood": "hacked", "relationships": {"X": 42.0}})
+	check(evil_npc.identity.trust == 1.0, "trust clamped on load")
+	check(evil_npc.identity.mood == "neutral", "unknown mood rejected")
+	check(evil_npc.identity.relationships["X"] == 1.0, "relationship clamped on load")
+
+	# --- Perf proxy: 200 NPC update loop < 50ms (headless proxy for 30+ FPS) ---
+	var crowd: Array = []
+	for i in range(200):
+		var c := NPC.new()
+		c.identity.npc_name = "NPC%d" % i
+		c.schedule.add_slot(8, "площадь", "гуляет")
+		c.memory.add_event("e%d" % i, 5, 1, i % 2 == 0)
+		crowd.append(c)
+	var tmap := TownMap.new()
+	tmap.npcs = crowd
+	var tp0 := Time.get_ticks_usec()
+	for frame in range(10):
+		for c in crowd:
+			c.tick(8)
+		for c in crowd:
+			tmap.pos_for(c, 8)
+	var tp_ms := (Time.get_ticks_usec() - tp0) / 10000.0
+	check(tp_ms < 50.0, "perf: 200 npc × 10 frames update+map < 50ms (%.1f ms)" % tp_ms)
+	tmap.free()
+
+	# --- Schedule overlaps for gossip (wave 7) ---
+	var so_a := NPC.new()
+	so_a.schedule.add_slot(8, "пекарня", "печёт хлеб")
+	so_a.schedule.add_slot(13, "рынок", "покупает цветы")
+	so_a.schedule.add_slot(18, "площадь", "гуляет")
+	var so_b := NPC.new()
+	so_b.schedule.add_slot(7, "рынок", "торгует цветами")
+	so_b.schedule.add_slot(20, "площадь", "танцует")
+	check(so_a.schedule.place_at(14)["place"] == so_b.schedule.place_at(14)["place"], "npcs overlap at market 14:00")
+	check(so_a.schedule.place_at(21)["place"] == so_b.schedule.place_at(21)["place"], "npcs overlap at square 21:00")
+	check(so_a.schedule.place_at(9)["place"] != so_b.schedule.place_at(9)["place"], "npcs separate in morning")
+
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:

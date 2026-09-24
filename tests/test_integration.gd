@@ -45,12 +45,22 @@ func _initialize() -> void:
 	await process_frame
 	check((game.find_child("LogLabel", true, false) as RichTextLabel).get_parsed_text().contains("вспоминает"), "recall hook at 5:00")
 
+	# Дневные цели: 2 разговора + помощь + сплетня (рынок, 14:00)
+	game.clock.total_minutes = 14 * 60
+	game.find_child("TalkButton", true, false).emit_signal("pressed")
+	game.find_child("TalkButton", true, false).emit_signal("pressed")
+	game.find_child("HelpButton", true, false).emit_signal("pressed")
+	check(game.ritual.all_done(), "daily goals completed via UI")
+	check(game.coins == DailyRitual.REWARD, "daily goals reward granted once")
+
 	# Новая «сессия»: сейв → воспоминание
 	game._save()
 	var game2 = scene.instantiate()
 	root.add_child(game2)
 	await process_frame
 	check(game2.player_name == "Макс", "new session restores name")
+	check(game2.coins == DailyRitual.REWARD, "new session restores coins")
+	check((game2.find_child("CoinsLabel", true, false) as Label).text.contains("25"), "coins label shows balance")
 	var l3 := (game2.find_child("LogLabel", true, false) as RichTextLabel).get_parsed_text()
 	check(l3.contains("Я помню") or l3.contains("Помню"), "new session npc recalls past action")
 
