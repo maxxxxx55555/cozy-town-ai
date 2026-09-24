@@ -1,0 +1,12 @@
+# Godot 4
+.godot/
+.import/
+export.cfg
+export_presets.cfg.local
+android/build/
+build/
+*.keystore
+*.translation
+.mono/
+data_*/
+secrets.local.md
