@@ -54,6 +54,10 @@ func gossip_with(partner: NPC, day := 1) -> String:
 	if evs.is_empty():
 		return "%s и %s молча кивают друг другу." % [identity.npc_name, partner.identity.npc_name]
 	var ev: Dictionary = evs[0]
+	# Не пересказываем одно и то же дважды за день (анти-спам сплетен).
+	for e in partner.memory.short_term + partner.memory.long_term:
+		if e["text"] == ev["text"] and int(e["day"]) == day:
+			return Gossip.line(self, partner, ev["text"])
 	# Сплетня распространяется: partner запоминает событие (слабее) и сближается.
 	partner.memory.add_event(ev["text"], maxi(int(ev["importance"]) - 1, 1), day, ev["about_player"])
 	meet(partner, 0.1)

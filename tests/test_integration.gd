@@ -13,8 +13,9 @@ func check(cond: bool, name: String) -> void:
 
 func _initialize() -> void:
 	await process_frame
-	if FileAccess.file_exists(SaveGame.SAVE_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveGame.SAVE_PATH))
+	SaveGame.set_path("user://save_integration.json")
+	if FileAccess.file_exists(SaveGame.path()):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveGame.path()))
 
 	var scene: PackedScene = load("res://scenes/main.tscn")
 	var game = scene.instantiate()
@@ -47,7 +48,9 @@ func _initialize() -> void:
 
 	# Дневные цели: 2 разговора + помощь + сплетня (рынок, 14:00)
 	game.clock.total_minutes = 14 * 60
+	game.session_time += 6.0
 	game.find_child("TalkButton", true, false).emit_signal("pressed")
+	game.session_time += 6.0 # кулдаун: цель не засчитывается чаще 5 сек
 	game.find_child("TalkButton", true, false).emit_signal("pressed")
 	game.find_child("HelpButton", true, false).emit_signal("pressed")
 	check(game.ritual.all_done(), "daily goals completed via UI")
@@ -74,6 +77,9 @@ func _initialize() -> void:
 	check(priv != null, "privacy panel opens")
 	var priv_text := (priv.get_child(0) as RichTextLabel).get_parsed_text() if priv else ""
 	check(priv_text.contains("устройстве") and priv_text.contains("Память NPC"), "privacy panel explains local npc memory")
+	game.find_child("PrivacyButton", true, false).emit_signal("pressed")
+	await process_frame
+	check(game.find_child("PrivacyPanel", true, false) == null, "privacy button toggles panel closed")
 
 	# Audio (wave 8)
 	check(game.sfx.size() == 3, "sfx players initialized")

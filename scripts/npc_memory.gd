@@ -4,6 +4,7 @@ extends RefCounted
 
 const SHORT_TERM_MAX := 10
 const LONG_TERM_IMPORTANCE := 7
+const MAX_LONG_TERM := 200 # потолок долговременной памяти (анти-DoS)
 
 var short_term: Array[Dictionary] = []
 var long_term: Array[Dictionary] = []
@@ -11,7 +12,7 @@ var player_name := ""
 
 func add_event(text: String, importance: int, day: int, about_player := false) -> void:
 	short_term.append({"text": text, "importance": importance, "day": day, "about_player": about_player})
-	if short_term.size() > SHORT_TERM_MAX:
+	if short_term.size() > SHORT_TERM_MAX or long_term.size() > MAX_LONG_TERM:
 		_consolidate()
 
 func _consolidate() -> void:
@@ -24,6 +25,12 @@ func _consolidate() -> void:
 	if kept.size() > SHORT_TERM_MAX:
 		kept = kept.slice(kept.size() - SHORT_TERM_MAX)
 	short_term = kept
+	while long_term.size() > MAX_LONG_TERM: # выкидываем наименее важное
+		var worst := 0
+		for i in range(1, long_term.size()):
+			if int(long_term[i]["importance"]) < int(long_term[worst]["importance"]):
+				worst = i
+		long_term.remove_at(worst)
 
 func recall_about_player() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

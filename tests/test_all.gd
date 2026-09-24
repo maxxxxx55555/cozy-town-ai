@@ -11,6 +11,7 @@ func check(cond: bool, name: String) -> void:
 		print("FAIL: ", name)
 
 func _init() -> void:
+	SaveGame.set_path("user://save_unit.json")
 	# --- Memory ---
 	var mem := NPCMemory.new()
 	mem.player_name = "Макс"
@@ -57,11 +58,11 @@ func _init() -> void:
 	var loaded := SaveGame.load_state()
 	check(loaded.get("coins", -1) == 100, "save roundtrip")
 
-	var f := FileAccess.open(SaveGame.SAVE_PATH, FileAccess.READ)
+	var f := FileAccess.open(SaveGame.path(), FileAccess.READ)
 	var raw = JSON.parse_string(f.get_as_text())
 	f.close()
 	raw["data"] = JSON.stringify({"coins": 999999, "day": 3})
-	var f2 := FileAccess.open(SaveGame.SAVE_PATH, FileAccess.WRITE)
+	var f2 := FileAccess.open(SaveGame.path(), FileAccess.WRITE)
 	f2.store_string(JSON.stringify(raw))
 	f2.close()
 	check(SaveGame.load_state().is_empty(), "tampered save rejected")
@@ -82,7 +83,9 @@ func _init() -> void:
 	# --- GameClock ---
 	var gc := GameClock.new()
 	check(gc.hour() == 8, "clock starts 08:00")
-	gc.advance(60 * 17) # +17ч → следующий день 01:00
+	gc.advance(60.0)
+	for i in range(16): # +17ч по минутам: смена суток
+		gc.advance(60.0)
 	check(gc.day == 2 and gc.hour() == 1, "clock rolls past midnight")
 	var gc2 := GameClock.new()
 	gc2.from_dict(gc.to_dict())
@@ -272,6 +275,36 @@ func _init() -> void:
 	check(so_a.schedule.place_at(14)["place"] == so_b.schedule.place_at(14)["place"], "npcs overlap at market 14:00")
 	check(so_a.schedule.place_at(21)["place"] == so_b.schedule.place_at(21)["place"], "npcs overlap at square 21:00")
 	check(so_a.schedule.place_at(9)["place"] != so_b.schedule.place_at(9)["place"], "npcs separate in morning")
+
+	# --- Bugfix wave 9 ---
+	var big_mem := NPCMemory.new()
+	for i in range(300):
+		big_mem.add_event("крупное событие %d" % i, 9, i / 30 + 1, true)
+	check(big_mem.long_term.size() <= NPCMemory.MAX_LONG_TERM, "long-term memory capped (anti-dos)")
+	check(big_mem.recall_about_player().size() > 0, "capped memory still recalls")
+
+	var gs1 := NPC.new()
+	gs1.identity.npc_name = "Марта"
+	gs1.memory.add_event("игрок купил хлеб", 8, 5, true)
+	var gs2 := NPC.new()
+	gs2.identity.npc_name = "Борис"
+	gs1.gossip_with(gs2, 5)
+	gs1.gossip_with(gs2, 5)
+	var gs_recall := gs2.memory.recall_about_player()
+	check(gs_recall.size() == 1, "gossip not duplicated same day")
+
+	var sh_clock := GameClock.new()
+	sh_clock.advance(100000.0)
+	check(sh_clock.total_minutes == 8 * 60 + int(GameClock.MAX_STEP) and sh_clock.day == 1, "clock speedhack clamped (no day jump)")
+	var sh_clock2 := GameClock.new()
+	sh_clock2.advance(16 * 3600.0)
+	check(sh_clock2.total_minutes == 8 * 60 + int(GameClock.MAX_STEP) and sh_clock2.day == 1, "background sleep cannot fast-forward days")
+
+	var future := '{"data":"{}","checksum":"%s","version":999}' % SaveGame._checksum("{}")
+	var ff := FileAccess.open(SaveGame.path(), FileAccess.WRITE)
+	ff.store_string(future)
+	ff.close()
+	check(SaveGame.load_state().is_empty(), "save from newer game version rejected")
 
 	if failures == 0:
 		print("ALL TESTS PASSED")

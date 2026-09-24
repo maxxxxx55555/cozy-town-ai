@@ -4,9 +4,10 @@ extends RefCounted
 
 var day := 1
 var total_minutes := 8 * 60 # старт в 08:00
+const MAX_STEP := 600.0 # секунд за кадр: защита от speedhack/сна
 
 func advance(real_seconds: float) -> void:
-	total_minutes += int(real_seconds)
+	total_minutes += int(clampf(real_seconds, 0.0, MAX_STEP))
 	while total_minutes >= 24 * 60:
 		total_minutes -= 24 * 60
 		day += 1

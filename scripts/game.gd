@@ -20,6 +20,8 @@ var town_map: TownMap
 var coins_label: Label
 var help_button: Button
 var privacy_button: Button
+const TALK_COOLDOWN := 5.0 # анти-спам дневных целей
+var last_talk_time := -999.0
 var sfx := {}
 var time_label: Label
 var name_input: LineEdit
@@ -57,7 +59,8 @@ func _process(delta: float) -> void:
 		_save()
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+	# Android: приложение уходит в фон — сейв обязателен (WM_CLOSE только на десктопе).
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == MainLoop.NOTIFICATION_APPLICATION_PAUSED:
 		_save()
 
 func _build_ui() -> void:
@@ -132,15 +135,19 @@ func _play(key: String) -> void:
 
 func _on_privacy() -> void:
 	_play("click")
+	var existing := find_child("PrivacyPanel", true, false)
+	if existing != null: # повторное нажатие закрывает панель
+		existing.queue_free()
+		return
 	var panel := PanelContainer.new()
 	panel.name = "PrivacyPanel"
 	var lbl := RichTextLabel.new()
 	lbl.bbcode_enabled = true
-	lbl.custom_minimum_size = Vector2(0, 240)
+	lbl.custom_minimum_size = Vector2(520, 260)
 	lbl.text = "[b]О данных и памяти NPC[/b]\n• Всё хранится только на твоём устройстве.\n• Приложение не требует интернет и не передаёт данные.\n• Память NPC: твои поступки и разговоры, до 10 событий краткосрочно + важные надолго.\n• Удали приложение — удалятся все сохранения.\n• Вопросы: кнопка «Сообщить»."
 	panel.add_child(lbl)
 	add_child(panel)
-	panel.position = Vector2(20, 60)
+	panel.position = Vector2(40, 80)
 
 func _spawn_town() -> void:
 	var marta := NPC.new()
@@ -197,8 +204,10 @@ func _on_talk() -> void:
 	var spot := npc.schedule.place_at(clock.hour())
 	_log(DialogueComposer.compose(npc, clock.day, clock.hour()))
 	_log("%s (%s)" % [npc.identity.npc_name, spot["place"]])
-	ritual.record("talk")
 	_play("click")
+	if session_time - last_talk_time >= TALK_COOLDOWN:
+		ritual.record("talk")
+		last_talk_time = session_time
 	var others := _others_at(npc, spot["place"])
 	if others.size() > 0:
 		var other: NPC = others[0]
