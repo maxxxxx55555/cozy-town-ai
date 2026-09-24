@@ -1,0 +1,60 @@
+name: android-aab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-aab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.7 + export templates
+        run: |
+          set -e
+          wget -q https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q Godot_v4.7-stable_linux.x86_64.zip
+          chmod +x Godot_v4.7-stable_linux.x86_64
+          mkdir -p ~/.local/share/godot/export_templates/4.7.stable
+          wget -q https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_export_templates.tpz
+          unzip -q Godot_v4.7-stable_export_templates.tpz -d tpz
+          cp tpz/templates/* ~/.local/share/godot/export_templates/4.7.stable/
+          ln -sf "$PWD/Godot_v4.7-stable_linux.x86_64" /usr/local/bin/godot
+
+      - name: Install Android build template
+        run: |
+          mkdir -p android
+          unzip -q ~/.local/share/godot/export_templates/4.7.stable/android_source.zip -d android/build
+
+      - name: Set up JDK 17 + Android SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+
+      - name: Configure keystore from secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > release.keystore
+          sed -i "s|keystore/release=\"\"|keystore/release=\"$PWD/release.keystore\"|" export_presets.cfg
+          sed -i "s|keystore/release_user=\"\"|keystore/release_user=\"$KEYSTORE_USER\"|" export_presets.cfg
+          sed -i "s|keystore/release_password=\"\"|keystore/release_password=\"$KEYSTORE_PASS\"|" export_presets.cfg
+
+      - name: Headless tests
+        run: godot --headless --path . --import && godot --headless --path . -s tests/test_all.gd
+
+      - name: Export AAB
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-release "Android" build/game.aab
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-aab
+          path: build/game.aab

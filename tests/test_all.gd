@@ -139,6 +139,30 @@ func _init() -> void:
 	var dt := Time.get_ticks_msec() - t0
 	check(dt < 200, "perf: 2000 memory ops + recall under 200ms (%d ms)" % dt)
 
+	# --- DialogueComposer (wave 4) ---
+	var dc_npc := NPC.new()
+	dc_npc.identity.npc_name = "Аня"
+	dc_npc.identity.traits = PackedStringArray(["энергичная"])
+	dc_npc.schedule.add_slot(7, "рынок", "торгует цветами")
+	dc_npc.memory.player_name = "Макс"
+	dc_npc.memory.add_event("игрок помог с ящиками", 8, 1, true)
+	var line := DialogueComposer.compose(dc_npc, 1, 8)
+	check(line.contains("Макс"), "composer greets by name")
+	check(line.contains("рынок") or line.contains("торгует"), "composer mentions current activity")
+	check(line.contains("игрок помог с ящиками"), "composer cites memory")
+	var no_name := NPC.new()
+	no_name.identity.npc_name = "Борис"
+	check(DialogueComposer.compose(no_name, 1, 9) == "Привет! Как тебя зовут?", "composer asks name when unknown")
+
+	# --- ReportService (Play AI-content requirement) ---
+	if FileAccess.file_exists(ReportService.REPORT_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(ReportService.REPORT_PATH))
+	check(ReportService.submit("other", "Найдена ошибка в реплике", {"day": 1}), "report accepted")
+	check(ReportService.count() == 1, "report stored")
+	check(not ReportService.submit("spam_reason", "x", {}), "report rejects unknown reason")
+	check(not ReportService.submit("bug", "   ", {}), "report rejects empty text")
+	check(not ReportService.submit("bug", "a".repeat(1001), {}), "report rejects oversized text")
+
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:

@@ -19,6 +19,7 @@ var time_label: Label
 var name_input: LineEdit
 var name_button: Button
 var talk_button: Button
+var report_button: Button
 
 func _ready() -> void:
 	_build_ui()
@@ -65,6 +66,10 @@ func _build_ui() -> void:
 	talk_button.text = "Поговорить"
 	talk_button.pressed.connect(_on_talk)
 	hb.add_child(talk_button)
+	report_button = Button.new()
+	report_button.text = "Сообщить"
+	report_button.pressed.connect(_on_report)
+	hb.add_child(report_button)
 
 func _spawn_town() -> void:
 	var marta := NPC.new()
@@ -117,7 +122,8 @@ func _on_talk() -> void:
 		return
 	var npc := _npc_at_hour(clock.hour())
 	var spot := npc.schedule.place_at(clock.hour())
-	_log("%s (%s): %s" % [npc.identity.npc_name, spot["place"], npc.greet(clock.day)])
+	_log(DialogueComposer.compose(npc, clock.day, clock.hour()))
+	_log("%s (%s)" % [npc.identity.npc_name, spot["place"]])
 	var others := _others_at(npc, spot["place"])
 	if others.size() > 0:
 		var other: NPC = others[0]
@@ -145,6 +151,10 @@ func _show_recall() -> void:
 		if evs.size() > 0:
 			_log("[i]%s вспоминает: %s[/i]" % [npc.identity.npc_name, evs[0]["text"]])
 			return
+
+func _on_report() -> void:
+	var ok := ReportService.submit("other", "Жалоба из игры (день %d)" % clock.day, {"day": clock.day})
+	_log("[color=#bb4444]Спасибо, жалоба сохранена (всего: %d).[/color]" % ReportService.count() if ok else "[color=#bb4444]Не удалось сохранить жалобу.[/color]")
 
 func _log(t: String) -> void:
 	log_label.append_text(t + "\n")

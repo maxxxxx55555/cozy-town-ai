@@ -20,5 +20,11 @@ Cozy life-sim: NPC помнит игрока и друг друга, сплет�
 ## Дальше (v1.1+)
 - Больше NPC/мест, события, квесты, монетизация (косметика, без pay-to-win), LLM-диалоги (с AI-декларацией Play).
 
+## Волна 4 — реализовано
+- DialogueComposer: процедурные реплики (память + характер + место + настроение), без LLM.
+- In-app report «Сообщить» (ReportService, user://reports.json) — требование Play для AI-контента.
+- docs/PLAY_COMPLIANCE.md: API 36, AAB, signing, AI-декларация, Data Safety, рейтинг.
+- CI .github/workflows/android-aab.yml: сборка AAB из тегов/пушей (keystore из Secrets).
+
 ## ASO
 Название: «Пазл из Жизни» / Puzzle of Life. Описание — хук в первые 80 символов. Иконка: уютный городок + лицо NPC. Скриншот 1: диалог «Я помню тебя, %name%!».
