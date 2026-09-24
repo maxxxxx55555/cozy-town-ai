@@ -19,6 +19,8 @@ var log_label: RichTextLabel
 var town_map: TownMap
 var coins_label: Label
 var help_button: Button
+var privacy_button: Button
+var sfx := {}
 var time_label: Label
 var name_input: LineEdit
 var name_button: Button
@@ -26,6 +28,7 @@ var talk_button: Button
 var report_button: Button
 
 func _ready() -> void:
+	_init_audio()
 	_build_ui()
 	_spawn_town()
 	town_map.npcs = npcs
@@ -103,6 +106,41 @@ func _build_ui() -> void:
 	help_button.text = "Помочь"
 	help_button.pressed.connect(_on_help)
 	hb.add_child(help_button)
+	privacy_button = Button.new()
+	privacy_button.name = "PrivacyButton"
+	privacy_button.text = "Данные"
+	privacy_button.pressed.connect(_on_privacy)
+	hb.add_child(privacy_button)
+
+const SFX_PATHS := {
+	"click": "res://assets/sfx/click.wav",
+	"coin": "res://assets/sfx/coin.wav",
+	"success": "res://assets/sfx/success.wav",
+}
+
+func _init_audio() -> void:
+	for key in SFX_PATHS.keys():
+		var p := AudioStreamPlayer.new()
+		p.name = key
+		p.stream = load(SFX_PATHS[key])
+		add_child(p)
+		sfx[key] = p
+
+func _play(key: String) -> void:
+	if sfx.has(key):
+		sfx[key].play()
+
+func _on_privacy() -> void:
+	_play("click")
+	var panel := PanelContainer.new()
+	panel.name = "PrivacyPanel"
+	var lbl := RichTextLabel.new()
+	lbl.bbcode_enabled = true
+	lbl.custom_minimum_size = Vector2(0, 240)
+	lbl.text = "[b]О данных и памяти NPC[/b]\n• Всё хранится только на твоём устройстве.\n• Приложение не требует интернет и не передаёт данные.\n• Память NPC: твои поступки и разговоры, до 10 событий краткосрочно + важные надолго.\n• Удали приложение — удалятся все сохранения.\n• Вопросы: кнопка «Сообщить»."
+	panel.add_child(lbl)
+	add_child(panel)
+	panel.position = Vector2(20, 60)
 
 func _spawn_town() -> void:
 	var marta := NPC.new()
@@ -149,6 +187,7 @@ func _on_name_submitted() -> void:
 		npc.memory.player_name = n
 		npc.memory.add_event("познакомился(ась) с игроком " + n, 8, clock.day, true)
 	_log("Марта: Запомню, %s! Заходи в гости." % n)
+	_play("click")
 	_save()
 
 func _on_talk() -> void:
@@ -159,6 +198,7 @@ func _on_talk() -> void:
 	_log(DialogueComposer.compose(npc, clock.day, clock.hour()))
 	_log("%s (%s)" % [npc.identity.npc_name, spot["place"]])
 	ritual.record("talk")
+	_play("click")
 	var others := _others_at(npc, spot["place"])
 	if others.size() > 0:
 		var other: NPC = others[0]
@@ -174,6 +214,7 @@ func _on_help() -> void:
 	var npc := _npc_at_hour(clock.hour())
 	_log("%s: %s" % [npc.identity.npc_name, npc.react_to_action("помог по хозяйству", 5, clock.day)])
 	ritual.record("kind")
+	_play("click")
 	_after_event()
 
 func _after_event() -> void:
@@ -182,6 +223,8 @@ func _after_event() -> void:
 	if reward > 0:
 		coins += reward
 		_log("[b]Цели дня выполнены! +%d монет[/b]" % reward)
+		_play("coin")
+		_play("success")
 		_save()
 	_update_coins()
 

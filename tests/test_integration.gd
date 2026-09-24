@@ -68,6 +68,19 @@ func _initialize() -> void:
 	game2.find_child("ReportButton", true, false).emit_signal("pressed")
 	check(ReportService.count() >= 1, "report button stores report")
 
+	# In-app privacy / data info (wave 8)
+	game.find_child("PrivacyButton", true, false).emit_signal("pressed")
+	var priv = game.find_child("PrivacyPanel", true, false)
+	check(priv != null, "privacy panel opens")
+	var priv_text := (priv.get_child(0) as RichTextLabel).get_parsed_text() if priv else ""
+	check(priv_text.contains("устройстве") and priv_text.contains("Память NPC"), "privacy panel explains local npc memory")
+
+	# Audio (wave 8)
+	check(game.sfx.size() == 3, "sfx players initialized")
+	check(game.find_child("coin", true, false) != null, "coin sfx player exists")
+	var coin_stream = (game.find_child("coin", true, false) as AudioStreamPlayer).stream
+	check(coin_stream != null, "coin sfx stream loaded")
+
 	game.queue_free()
 	game2.queue_free()
 	await process_frame
