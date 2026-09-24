@@ -15,6 +15,7 @@ var autosave_time := 0.0
 var recall_shown := false
 
 var log_label: RichTextLabel
+var town_map: TownMap
 var time_label: Label
 var name_input: LineEdit
 var name_button: Button
@@ -24,6 +25,7 @@ var report_button: Button
 func _ready() -> void:
 	_build_ui()
 	_spawn_town()
+	town_map.npcs = npcs
 	_load()
 	_intro()
 
@@ -32,6 +34,8 @@ func _process(delta: float) -> void:
 	autosave_time += delta
 	clock.advance(delta)
 	time_label.text = clock.time_string()
+	town_map.hour = clock.hour()
+	town_map.queue_redraw()
 	for npc in npcs:
 		npc.tick(clock.hour())
 	if not recall_shown and session_time >= RECALL_DELAY_SEC:
@@ -51,6 +55,10 @@ func _build_ui() -> void:
 	time_label = Label.new()
 	time_label.name = "TimeLabel"
 	vb.add_child(time_label)
+	town_map = TownMap.new()
+	town_map.name = "TownMap"
+	town_map.custom_minimum_size = Vector2(0, 340)
+	vb.add_child(town_map)
 	log_label = RichTextLabel.new()
 	log_label.name = "LogLabel"
 	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL

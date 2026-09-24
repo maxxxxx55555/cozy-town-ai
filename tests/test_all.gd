@@ -175,6 +175,39 @@ func _init() -> void:
 	mt.tick(9)
 	check(mt.identity.mood == "angry", "anger not erased by time")
 
+	# --- TownMap (wave 6) ---
+	var tm := TownMap.new()
+	var tm_a := NPC.new()
+	tm_a.identity.npc_name = "Марта"
+	tm_a.schedule.add_slot(8, "пекарня", "печёт хлеб")
+	var tm_b := NPC.new()
+	tm_b.identity.npc_name = "Лука"
+	tm_b.schedule.add_slot(9, "причал", "ловит рыбу")
+	tm.npcs = [tm_a, tm_b]
+	var pa := tm.pos_for(tm_a, 8)
+	var pb := tm.pos_for(tm_b, 9)
+	check(pa != pb and pa.x >= 0.0 and pb.x >= 0.0, "townmap places npcs at different spots")
+	var pm := tm.pos_for(tm_a, 23)
+	check(pm == tm.pos_for(tm_a, 23), "townmap position stable for same hour")
+	tm.free()
+
+	# --- LLMDialogue opt-in (wave 6) ---
+	check(not LLMDialogue.ENABLED, "llm dialogue disabled by default")
+	var llm_npc := NPC.new()
+	llm_npc.identity.npc_name = "Марта"
+	llm_npc.identity.traits = PackedStringArray(["добрая", "болтливая"])
+	llm_npc.identity.trust = 0.8
+	llm_npc.memory.player_name = "Макс"
+	llm_npc.memory.add_event("игрок помог с хлебом", 8, 1, true)
+	var req := LLMDialogue.build_request(llm_npc, "  привет  ", "https://api.example/v1/chat", "k")
+	check(req["body"].contains("Марта"), "llm request carries npc name")
+	check(req["body"].contains("помог с хлебом"), "llm request carries memory")
+	check(req["body"].contains("привет"), "llm request sanitizes input")
+	check((req["headers"] as Array).size() == 2, "llm request has auth+content-type headers")
+	check(LLMDialogue.sanitize_input("x".repeat(600)).length() == 500, "llm input truncated to 500")
+	check(LLMDialogue.filter_output("y".repeat(500)).length() == LLMDialogue.MAX_OUTPUT, "llm output capped")
+	check(not "\n\n" in LLMDialogue.filter_output("a\n\n\nb"), "llm output collapses newlines")
+
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:
