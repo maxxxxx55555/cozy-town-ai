@@ -2,6 +2,7 @@ extends SceneTree
 ## Headless-тесты: godot --headless -s tests/test_all.gd → exit 0 = pass
 
 var failures := 0
+var owned_nodes: Array[Node] = []
 
 func check(cond: bool, name: String) -> void:
 	if cond:
@@ -10,8 +11,23 @@ func check(cond: bool, name: String) -> void:
 		failures += 1
 		print("FAIL: ", name)
 
+func own(node: Node) -> Node:
+	owned_nodes.append(node)
+	return node
+
+func own_npc() -> NPC:
+	return own(NPC.new()) as NPC
+
+func own_town_map() -> TownMap:
+	return own(TownMap.new()) as TownMap
+
 func _init() -> void:
 	SaveGame.set_path("user://save_unit.json")
+	ReportService.set_path("user://reports_unit.json")
+	for suffix in ["", SaveGame.BACKUP_SUFFIX, SaveGame.TEMP_SUFFIX]:
+		var p: String = SaveGame.path() + str(suffix)
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
 	# --- Memory ---
 	var mem := NPCMemory.new()
 	mem.player_name = "Макс"
@@ -25,7 +41,7 @@ func _init() -> void:
 	check(recalled.size() > 0 and recalled[0]["text"] == "игрок подарил цветы", "memory recalls player event")
 
 	# --- Identity / reactions ---
-	var npc := NPC.new()
+	var npc := own_npc()
 	npc.identity.npc_name = "Марта"
 	npc.react_to_action("помог в саду", 5, 1)
 	check(npc.identity.trust > 0.0, "trust rises on good action")
@@ -41,13 +57,14 @@ func _init() -> void:
 	check(sched.place_at(10)["place"] == "мастерская", "schedule midday")
 	check(sched.place_at(20)["place"] == "площадь", "schedule evening")
 	check(sched.place_at(3)["place"] == "home", "schedule default night")
+	check(sched.place_at(23)["place"] == "home" and sched.place_at(23)["activity"] == "sleep", "schedule returns home at night")
 
 	# --- Gossip ---
-	var a := NPC.new()
+	var a := own_npc()
 	a.identity.npc_name = "Марта"
 	a.memory.player_name = "Макс"
 	a.memory.add_event("игрок помог в саду", 8, 1, true)
-	var b := NPC.new()
+	var b := own_npc()
 	b.identity.npc_name = "Борис"
 	var g := a.gossip_with(b)
 	check(g.length() > 0 and g.contains("помог"), "gossip mentions event")
@@ -65,18 +82,20 @@ func _init() -> void:
 	var f2 := FileAccess.open(SaveGame.path(), FileAccess.WRITE)
 	f2.store_string(JSON.stringify(raw))
 	f2.close()
+	if FileAccess.file_exists(SaveGame.path() + SaveGame.BACKUP_SUFFIX):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveGame.path() + SaveGame.BACKUP_SUFFIX))
 	check(SaveGame.load_state().is_empty(), "tampered save rejected")
 
 	var bad := {"coins": -50}
 	check(SaveGame.sanitize(bad)["coins"] == 0, "negative coins sanitized")
 
 	# --- NPC serialize roundtrip ---
-	var n1 := NPC.new()
+	var n1 := own_npc()
 	n1.identity.npc_name = "Марта"
 	n1.identity.trust = 0.5
 	n1.memory.player_name = "Макс"
 	n1.memory.add_event("игрок: чай", 8, 1, true)
-	var n2 := NPC.new()
+	var n2 := own_npc()
 	n2.from_dict(n1.to_dict())
 	check(n2.memory.player_name == "Макс" and n2.identity.trust == 0.5, "npc serialize roundtrip")
 
@@ -101,11 +120,11 @@ func _init() -> void:
 	check(inv.count("apple") == 2 and inv.count("hacked") == 0 and inv.count("junk") == 0, "inventory from_dict drops non-positive")
 
 	# --- Gossip propagation ---
-	var g1 := NPC.new()
+	var g1 := own_npc()
 	g1.identity.npc_name = "Марта"
 	g1.memory.player_name = "Макс"
 	g1.memory.add_event("игрок спас кота", 9, 1, true)
-	var g2 := NPC.new()
+	var g2 := own_npc()
 	g2.identity.npc_name = "Борис"
 	g1.gossip_with(g2, 2)
 	var b_recall := g2.memory.recall_about_player()
@@ -118,24 +137,24 @@ func _init() -> void:
 	check(clean["unlocks"] == ["garden"], "unlock whitelist drops unknown + dupes")
 
 	# --- Relationships (wave 3) ---
-	var r1 := NPC.new()
+	var r1 := own_npc()
 	r1.identity.npc_name = "Лука"
 	r1.memory.player_name = "Макс"
 	r1.memory.add_event("игрок принёс рыбу", 7, 1, true)
-	var r2 := NPC.new()
+	var r2 := own_npc()
 	r2.identity.npc_name = "Аня"
 	r1.gossip_with(r2, 3)
 	check(r1.identity.relationships.get("Аня", 0.0) > 0.0, "gossip builds bond a→b")
 	check(r2.identity.relationships.get("Лука", 0.0) > 0.0, "gossip builds bond b→a")
 	r1.meet(r2, 0.2)
 	check(is_equal_approx(r1.identity.relationships["Аня"], 0.3), "meet clamps/bumps relationship")
-	var r3 := NPC.new()
+	var r3 := own_npc()
 	r3.from_dict(r1.to_dict())
 	check(r3.identity.relationships.get("Аня", 0.0) == r1.identity.relationships["Аня"], "relationships serialize roundtrip")
 
 	# --- Perf budget (headless simulation) ---
 	var t0 := Time.get_ticks_msec()
-	var perf_npc := NPC.new()
+	var perf_npc := own_npc()
 	for i in range(2000):
 		perf_npc.memory.add_event("событие %d" % i, i % 10, 1, i % 3 == 0)
 	perf_npc.memory.recall_about_player()
@@ -143,7 +162,7 @@ func _init() -> void:
 	check(dt < 200, "perf: 2000 memory ops + recall under 200ms (%d ms)" % dt)
 
 	# --- DialogueComposer (wave 4) ---
-	var dc_npc := NPC.new()
+	var dc_npc := own_npc()
 	dc_npc.identity.npc_name = "Аня"
 	dc_npc.identity.traits = PackedStringArray(["энергичная"])
 	dc_npc.schedule.add_slot(7, "рынок", "торгует цветами")
@@ -153,21 +172,31 @@ func _init() -> void:
 	check(line.contains("Макс"), "composer greets by name")
 	check(line.contains("рынок") or line.contains("торгует"), "composer mentions current activity")
 	check(line.contains("игрок помог с ящиками"), "composer cites memory")
-	var no_name := NPC.new()
+	var no_name := own_npc()
 	no_name.identity.npc_name = "Борис"
 	check(DialogueComposer.compose(no_name, 1, 9) == "Привет! Как тебя зовут?", "composer asks name when unknown")
 
 	# --- ReportService (Play AI-content requirement) ---
-	if FileAccess.file_exists(ReportService.REPORT_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ReportService.REPORT_PATH))
+	for suffix in ["", ReportService.BACKUP_SUFFIX, ReportService.TEMP_SUFFIX]:
+		var report_path: String = ReportService.path() + str(suffix)
+		if FileAccess.file_exists(report_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(report_path))
 	check(ReportService.submit("other", "Найдена ошибка в реплике", {"day": 1}), "report accepted")
 	check(ReportService.count() == 1, "report stored")
 	check(not ReportService.submit("spam_reason", "x", {}), "report rejects unknown reason")
 	check(not ReportService.submit("bug", "   ", {}), "report rejects empty text")
 	check(not ReportService.submit("bug", "a".repeat(1001), {}), "report rejects oversized text")
+	var malformed_report := FileAccess.open(ReportService.path(), FileAccess.WRITE)
+	malformed_report.store_string('{"not":"an array"}')
+	malformed_report.close()
+	check(ReportService.list().is_empty(), "report rejects valid-json non-array payload")
+	var malformed_items := FileAccess.open(ReportService.path(), FileAccess.WRITE)
+	malformed_items.store_string('[{"reason":"other","text":"kept","context":"bad","ts":"bad"},"bad",{"reason":"unknown","text":"drop"}]')
+	malformed_items.close()
+	check(ReportService.list().size() == 1 and ReportService.list()[0]["text"] == "kept", "report normalizes malformed entries")
 
 	# --- Mood by day context (wave 5) ---
-	var mt := NPC.new()
+	var mt := own_npc()
 	mt.identity.npc_name = "Марта"
 	mt.schedule.add_slot(8, "пекарня", "печёт хлеб")
 	mt.tick(9)
@@ -179,11 +208,11 @@ func _init() -> void:
 	check(mt.identity.mood == "angry", "anger not erased by time")
 
 	# --- TownMap (wave 6) ---
-	var tm := TownMap.new()
-	var tm_a := NPC.new()
+	var tm := own_town_map()
+	var tm_a := own_npc()
 	tm_a.identity.npc_name = "Марта"
 	tm_a.schedule.add_slot(8, "пекарня", "печёт хлеб")
-	var tm_b := NPC.new()
+	var tm_b := own_npc()
 	tm_b.identity.npc_name = "Лука"
 	tm_b.schedule.add_slot(9, "причал", "ловит рыбу")
 	tm.npcs = [tm_a, tm_b]
@@ -192,11 +221,24 @@ func _init() -> void:
 	check(pa != pb and pa.x >= 0.0 and pb.x >= 0.0, "townmap places npcs at different spots")
 	var pm := tm.pos_for(tm_a, 23)
 	check(pm == tm.pos_for(tm_a, 23), "townmap position stable for same hour")
+	var same_a := own_npc()
+	same_a.identity.npc_name = "Борис"
+	same_a.schedule.add_slot(8, "home", "спит")
+	var same_b := own_npc()
+	same_b.identity.npc_name = "Лука"
+	same_b.schedule.add_slot(8, "home", "спит")
+	tm.npcs = [same_a, same_b]
+	var same_a_pos := tm.pos_for(same_a, 8)
+	var same_b_pos := tm.pos_for(same_b, 8)
+	check(same_a_pos.distance_to(same_b_pos) >= 60.0, "townmap separates npc labels in one place")
+	check(same_a_pos.y >= 18.0 and same_b_pos.y >= 18.0, "townmap keeps home npc inside map")
+	check(tm.npc_label_position(same_a, 8).y > same_a_pos.y, "townmap places npc labels below sprites")
+	check(tm.display_place_name("home") == "дом", "townmap uses russian place label")
 	tm.free()
 
 	# --- LLMDialogue opt-in (wave 6) ---
 	check(not LLMDialogue.ENABLED, "llm dialogue disabled by default")
-	var llm_npc := NPC.new()
+	var llm_npc := own_npc()
 	llm_npc.identity.npc_name = "Марта"
 	llm_npc.identity.traits = PackedStringArray(["добрая", "болтливая"])
 	llm_npc.identity.trust = 0.8
@@ -237,8 +279,10 @@ func _init() -> void:
 	var clean2 := SaveGame.sanitize(hacked2)
 	check(clean2["coins"] == SaveGame.MAX_COINS, "coins capped at max")
 	check((clean2["player_name"] as String).length() == SaveGame.MAX_NAME and "\n" not in clean2["player_name"], "player_name sanitized/capped")
+	check(SaveGame.sanitize_name("[b]Макс[/b]") == "Макс", "player_name strips bbcode tags")
+	check(SaveGame.sanitize_name(null) == "", "non-string player name is rejected")
 	check(clean2["clock"]["day"] == 1 and clean2["clock"]["total_minutes"] == 0, "clock clamped")
-	var evil_npc := NPC.new()
+	var evil_npc := own_npc()
 	evil_npc.from_dict({"npc_name": "z".repeat(40), "trust": 99.0, "mood": "hacked", "relationships": {"X": 42.0}})
 	check(evil_npc.identity.trust == 1.0, "trust clamped on load")
 	check(evil_npc.identity.mood == "neutral", "unknown mood rejected")
@@ -247,12 +291,29 @@ func _init() -> void:
 	# --- Perf proxy: 200 NPC update loop < 50ms (headless proxy for 30+ FPS) ---
 	var crowd: Array = []
 	for i in range(200):
-		var c := NPC.new()
+		var c := own_npc()
 		c.identity.npc_name = "NPC%d" % i
 		c.schedule.add_slot(8, "площадь", "гуляет")
 		c.memory.add_event("e%d" % i, 5, 1, i % 2 == 0)
 		crowd.append(c)
-	var tmap := TownMap.new()
+	var label_npcs: Array[NPC] = []
+	for npc_name in ["Марта", "Борис", "Лука", "Аня"]:
+		var label_npc := own_npc()
+		label_npc.identity.npc_name = npc_name
+		label_npcs.append(label_npc)
+	var label_map := own_town_map()
+	label_map.npcs = label_npcs
+	var label_rects: Array[Rect2] = label_map.label_rects_for_hour(8)
+	var labels_overlap := false
+	for i in range(label_rects.size()):
+		for j in range(i):
+			if label_rects[i].intersects(label_rects[j]):
+				labels_overlap = true
+	check(not labels_overlap, "townmap label layout avoids collisions")
+	label_map.free()
+
+	var tmap := own_town_map()
+	check(TownMap.ROUTES.size() == 6, "townmap uses six readable routes")
 	tmap.npcs = crowd
 	var tp0 := Time.get_ticks_usec()
 	for frame in range(10):
@@ -265,11 +326,11 @@ func _init() -> void:
 	tmap.free()
 
 	# --- Schedule overlaps for gossip (wave 7) ---
-	var so_a := NPC.new()
+	var so_a := own_npc()
 	so_a.schedule.add_slot(8, "пекарня", "печёт хлеб")
 	so_a.schedule.add_slot(13, "рынок", "покупает цветы")
 	so_a.schedule.add_slot(18, "площадь", "гуляет")
-	var so_b := NPC.new()
+	var so_b := own_npc()
 	so_b.schedule.add_slot(7, "рынок", "торгует цветами")
 	so_b.schedule.add_slot(20, "площадь", "танцует")
 	check(so_a.schedule.place_at(14)["place"] == so_b.schedule.place_at(14)["place"], "npcs overlap at market 14:00")
@@ -283,10 +344,10 @@ func _init() -> void:
 	check(big_mem.long_term.size() <= NPCMemory.MAX_LONG_TERM, "long-term memory capped (anti-dos)")
 	check(big_mem.recall_about_player().size() > 0, "capped memory still recalls")
 
-	var gs1 := NPC.new()
+	var gs1 := own_npc()
 	gs1.identity.npc_name = "Марта"
 	gs1.memory.add_event("игрок купил хлеб", 8, 5, true)
-	var gs2 := NPC.new()
+	var gs2 := own_npc()
 	gs2.identity.npc_name = "Борис"
 	gs1.gossip_with(gs2, 5)
 	gs1.gossip_with(gs2, 5)
@@ -305,6 +366,10 @@ func _init() -> void:
 	ff.store_string(future)
 	ff.close()
 	check(SaveGame.load_state().is_empty(), "save from newer game version rejected")
+
+	for node in owned_nodes:
+		if is_instance_valid(node):
+			node.free()
 
 	if failures == 0:
 		print("ALL TESTS PASSED")

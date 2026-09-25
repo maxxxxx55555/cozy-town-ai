@@ -1,17 +1,18 @@
-﻿# AUDIT_STATE — «Пазл из Жизни»
-Волна: 10 (финал) | Score: **92%** (9.2/10)
+# AUDIT_STATE — «Пазл из Жизни»
+Волна: hardening после wave 10, wave 12 visual/robustness. Это не финальный сертификат Google Play: Android export и device QA должны быть подтверждены отдельно.
 
-## Закрыто в волне 10
-1. Полный GDD (описание игры) и финальное ТЗ (TZ.md) — перезаписаны целиком.
-2. docs/RELEASE_CHECKLIST.md — пошаговый релиз (AAB, Console, device QA).
-3. Кап журнала UI 300 строк (+тест) — анти-утечка памяти в долгой сессии.
-4. Планировочные файлы task_plan.md / findings.md / progress.md.
-5. Финальная верификация: 76 unit + 20 integration + smoke, все exit 0; скриншоты пересняты.
+## Что реально проверено в текущем workspace
+1. Godot 4.7 import/parse/editor scan проходит без ошибок.
+2. Unit, integration и regression headless-наборы проходят; smoke главной сцены проходит.
+3. Сейв: checksum, temp + `.bak`, fallback при битом primary, санитизация вложенных данных.
+4. Время: дробные `delta` накапливаются и 1 реальная секунда = 1 игровая минута.
+5. UI: адаптивная сетка, 3-колоночная панель действий, collision-safe подписи карты, контекстная/пустая подсказка журнала, 1080×1920 store-кадры, подключённые спрайты, 48-секундная музыка с явным loop range, mute/unmute с сохранением настройки, отчёт с пользовательским текстом, сброс прогресса.
+6. Локальная верификация: 87 unit PASS, 43 integration PASS, 25 regression PASS, headless smoke exit 0, capture exit 0; `git diff --check` чистый.
+7. Android preset структурно AAB/target SDK 36/arm64+armeabi-v7a/no INTERNET; CI запускает unit+integration+regression.
 
-## GAP
-1-7,10 ✅ | 8 ⚠️ (keystore+CI+скрипты готовы, AAB ждёт сети) | 9 ⚠️ (в репо готово, Console вручную)
-
-## Что осталось только от владельца
-- AAB: канал сети ≥1 ГБ (или GitHub Actions, workflow готов).
-- Play Console: аккаунт, signing, AI/Data Safety, листинг, rollout.
-- Device QA: FPS ≥ 30, пауза/возврат, размер сборки.
+## Честные оставшиеся блокеры
+- Локально отсутствует `android_source.zip`/полный export template, поэтому AAB на этой машине не собран.
+- Успешный GitHub Actions artifact для текущих изменений и загрузка в Google Play Console не подтверждены.
+- Нужна ротация release keystore/пароля: старые реквизиты уже были опубликованы в предыдущем коммите/переписке и не считаются безопасными.
+- Нужен physical Android device QA: FPS, сворачивание/возврат, звук, тач-таргеты, размер APK/AAB.
+- Это офлайн-игра: локальный checksum/лимиты защищают от случайной и простой ручной порчи, но не являются серверным anti-cheat.

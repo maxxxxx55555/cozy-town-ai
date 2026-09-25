@@ -41,13 +41,20 @@ jobs:
           KEYSTORE_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
           KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          echo "$KEYSTORE_B64" | base64 -d > release.keystore
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" && test -n "$KEYSTORE_USER" && test -n "$KEYSTORE_PASS"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > release.keystore
+          test -s release.keystore
           sed -i "s|keystore/release=\"\"|keystore/release=\"$PWD/release.keystore\"|" export_presets.cfg
           sed -i "s|keystore/release_user=\"\"|keystore/release_user=\"$KEYSTORE_USER\"|" export_presets.cfg
           sed -i "s|keystore/release_password=\"\"|keystore/release_password=\"$KEYSTORE_PASS\"|" export_presets.cfg
 
       - name: Headless tests
-        run: godot --headless --path . --import && godot --headless --path . -s tests/test_all.gd && godot --headless --path . -s tests/test_integration.gd
+        run: |
+          godot --headless --path . --import
+          godot --headless --path . -s tests/test_all.gd
+          godot --headless --path . -s tests/test_integration.gd
+          godot --headless --path . -s tests/test_regressions.gd
 
       - name: Export AAB
         run: |

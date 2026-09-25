@@ -51,10 +51,14 @@ func to_dict() -> Dictionary:
 	return {"day": day, "progress": progress.duplicate(), "claimed": claimed}
 
 func from_dict(d: Dictionary) -> void:
-	day = d.get("day", 0)
-	claimed = d.get("claimed", false)
+	var raw_day = d.get("day", 0)
+	day = clampi(int(raw_day) if (typeof(raw_day) == TYPE_INT or typeof(raw_day) == TYPE_FLOAT) else 0, 0, 9999)
+	claimed = bool(d.get("claimed", false))
 	progress.clear()
+	var raw_progress = d.get("progress", {})
+	if typeof(raw_progress) != TYPE_DICTIONARY:
+		raw_progress = {}
 	for g in GOALS: # только известные id, только неотрицательные значения
-		var v = d.get("progress", {}).get(g["id"], 0)
+		var v = raw_progress.get(g["id"], 0)
 		if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
 			progress[g["id"]] = maxi(int(v), 0)

@@ -27,15 +27,16 @@
 | scripts/town_map.gd | карта городка: NPC по расписанию, цвет = mood |
 | tests/test_all.gd | юнит-тесты (SceneTree) |
 | tests/test_integration.gd | интеграция UI-хуков, сейв между сессиями, report, audio, privacy |
-| tools/ | gen_sfx.ps1, gen_store_art.ps1, capture_screens.gd, fetch_templates.py, install_android_template.ps1, patch_local_secrets.ps1 |
+| tools/ | gen_sfx.ps1, gen_music.py, gen_store_art.ps1, capture_screens.gd, fetch_templates.py, install_android_template.ps1, patch_local_secrets.ps1 |
 | export_presets.cfg | Android preset: AAB, API 36, custom build, arm64+armeabi-v7a |
 | .github/workflows/android-aab.yml | CI: импорт шаблонов, тесты, экспорт AAB, артефакт |
 
 ## 2. Команды (DoD-верификация)
 ```
 godot --headless --path . --import
-godot --headless --path . -s tests/test_all.gd          # 76+ PASS, exit 0
-godot --headless --path . -s tests/test_integration.gd  # 20+ PASS, exit 0
+godot --headless --path . -s tests/test_all.gd          # 87 PASS, exit 0
+godot --headless --path . -s tests/test_integration.gd  # 43 PASS, exit 0
+godot --headless --path . -s tests/test_regressions.gd # 25 PASS, exit 0
 godot --headless --path . --quit-after 3                # smoke: exit 0
 godot --path . -s tools/capture_screens.gd --resolution 1080x1920
 godot --headless --path . --export-release "Android" build/game.aab
@@ -69,15 +70,15 @@ godot --headless --path . --export-release "Android" build/game.aab
 
 ## 6. Definition of Done (релиз)
 - [x] GDD/TZ/ASO/PRIVACY/PLAY_COMPLIANCE/MONETIZATION/TESTING актуальны
-- [x] 76 unit + 20 integration тестов зелёные, smoke exit 0
-- [x] Android preset: API 36, AAB, custom build, обе ABI
+- [x] Unit + integration + regression тесты и smoke проходят локально (87/42/25 PASS)
+- [x] Android preset: API 36, AAB, custom build, обе ABI, launcher icon 1024×1024
 - [x] Keystore создан, секреты вне git, скрипт инъекции в preset
-- [x] CI-workflow для сборки AAB
+- [x] CI-workflow для сборки AAB и запуска unit/integration/regression
 - [ ] AAB собран локально (блокер: нет export templates, 1279 МБ, сеть ~19 КБ/с)
 - [ ] Загрузка в Play Console, Play App Signing, AI/Data Safety формы, релиз 100%
 - [ ] Device QA: FPS ≥ 30, сворачивание/возврат, отсутствие INTERNET-разрешений
 
 ## 7. Известные ограничения
-- Текстовая (кодовая) графика; нет музыки и анимаций.
+- Текстовая (кодовая) графика поверх подключённых пиксельных спрайтов; нет пока полноценной покадровой анимации.
 - Один сейв-слот; нет облачных сохранений.
 - Локализация только RU.

@@ -35,5 +35,5 @@ git checkout export_presets.cfg             # убрать секреты из �
 6. Production rollout: 20% → 100%; следить за vitals (ANR/crash-free ≥ 99%).
 
 ## C. Что уже сделано и проверено в репозитории
-- Код, 96 автотестов (76 unit + 20 integration), smoke, скриншоты, ASO-ассеты, сейв с анти-читом,
-  дневные цели, карта, SFX, privacy-панель, report, CI-workflow, keystore, скрипты сборки.
+- Код, unit/integration/regression автотесты, smoke, скриншоты, ASO-ассеты, спрайты NPC/мест, фоновая музыка, privacy-панель, пользовательский отчёт, сброс прогресса, сейв с checksum/backup, дневные цели, карта, SFX, CI-workflow и скрипты сборки.
+- Exact test count: запускать `tests/test_all.gd`, `tests/test_integration.gd`, `tests/test_regressions.gd`; текущий локальный pipeline завершается успешно.

@@ -5,7 +5,7 @@
 2. Формат релиза: **.AAB** (`gradle_build/export_format=1`). APK — только для локальных тестов. ✅ в репо
 3. **Play App Signing** — включён по умолчанию при первой загрузке AAB в Console (шаг Console). Upload keystore: release.keystore (в git НЕ коммитится).
 4. **App content → AI-generated content**: сейчас диалоги NPC процедурные (DialogueComposer, без LLM) → декларация «AI не используется для генерации контента». Если включим LLM-диалоги — отметить *text generation* + правила (report-кнопка, фильтры).
-5. **In-app report** — кнопка «Сообщить» (ReportService, user://reports.json, ≤50 записей). ✅ в репо. Требование Play для AI-контента выполнено на уровне UI.
+5. **In-app report** — кнопка «Сообщить» открывает локальный диалог с текстом пользователя (ReportService, user://reports.json, ≤50 записей). ✅ в репо.
 6. **Data Safety**: память NPC и сейв хранятся **локально** (user://save.json, user://reports.json), не передаются на сервер → «No data collected» при текущей архитектуре. При добавлении аналитики/IAP обновить форму.
 7. Permissions: интернет не запрашивается (`permissions/internet=false`) — соответствует Data Safety «no data shared».
 8. Min SDK: по умолчанию Godot (24) — допустимо для API 36.

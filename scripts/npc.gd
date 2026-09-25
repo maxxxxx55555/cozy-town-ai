@@ -75,13 +75,17 @@ func to_dict() -> Dictionary:
 
 func from_dict(d: Dictionary) -> void:
 	identity.npc_name = str(d.get("npc_name", "")).left(SaveGame.MAX_NAME)
-	identity.trust = clampf(float(d.get("trust", 0.0)), -1.0, 1.0)
+	var raw_trust = d.get("trust", 0.0)
+	identity.trust = clampf(float(raw_trust) if (typeof(raw_trust) == TYPE_INT or typeof(raw_trust) == TYPE_FLOAT) else 0.0, -1.0, 1.0)
 	var moods := ["neutral", "happy", "angry", "sleepy"]
 	var m := str(d.get("mood", "neutral"))
 	identity.mood = m if m in moods else "neutral"
 	identity.relationships.clear()
-	for k in d.get("relationships", {}).keys():
-		var v = d["relationships"][k]
-		if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
-			identity.relationships[str(k).left(SaveGame.MAX_NAME)] = clampf(float(v), -1.0, 1.0)
-	memory.from_dict(d.get("memory", {}))
+	var raw_relationships = d.get("relationships", {})
+	if typeof(raw_relationships) == TYPE_DICTIONARY:
+		for k in raw_relationships.keys():
+			var v = raw_relationships[k]
+			if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT:
+				identity.relationships[str(k).left(SaveGame.MAX_NAME)] = clampf(float(v), -1.0, 1.0)
+	var raw_memory = d.get("memory", {})
+	memory.from_dict(raw_memory if typeof(raw_memory) == TYPE_DICTIONARY else {})

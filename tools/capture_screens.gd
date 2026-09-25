@@ -1,9 +1,27 @@
 extends SceneTree
-## Реальные скриншоты стора из живого билда:
-## godot --path . -s tools/capture_screens.gd --resolution 540x960
+## Реальные скриншоты стора из живого билда в целевом portrait-размере:
+## godot --path . -s tools/capture_screens.gd --resolution 1080x1920
 
 func _initialize() -> void:
+	if DisplayServer.get_name() == "headless":
+		push_error("capture_screens.gd requires a rendering display; run without --headless")
+		quit(1)
+		return
 	await process_frame
+	# Store screenshots use the game's portrait target, independent of the desktop window size.
+	root.size = Vector2i(1080, 1920)
+	await process_frame
+	var capture_id := Time.get_ticks_usec()
+	SaveGame.set_path("user://capture_screens_%d.json" % capture_id)
+	ReportService.set_path("user://capture_reports_%d.json" % capture_id)
+	for suffix in ["", SaveGame.BACKUP_SUFFIX, SaveGame.TEMP_SUFFIX]:
+		var save_path: String = SaveGame.path() + str(suffix)
+		if FileAccess.file_exists(save_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
+	for suffix in ["", ReportService.BACKUP_SUFFIX, ReportService.TEMP_SUFFIX]:
+		var report_path: String = ReportService.path() + str(suffix)
+		if FileAccess.file_exists(report_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(report_path))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("assets/store"))
 	var scene: PackedScene = load("res://scenes/main.tscn")
 	var game = scene.instantiate()
@@ -35,6 +53,18 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 	await _shot("assets/store/real_6_evening.png")
+	game._stop_audio()
+	game.free()
+	for _i in range(30):
+		await process_frame
+	for suffix in ["", SaveGame.BACKUP_SUFFIX, SaveGame.TEMP_SUFFIX]:
+		var save_path: String = SaveGame.path() + str(suffix)
+		if FileAccess.file_exists(save_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
+	for suffix in ["", ReportService.BACKUP_SUFFIX, ReportService.TEMP_SUFFIX]:
+		var report_path: String = ReportService.path() + str(suffix)
+		if FileAccess.file_exists(report_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(report_path))
 	print("SCREENSHOTS DONE")
 	quit(0)
 

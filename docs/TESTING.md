@@ -3,8 +3,9 @@
 ## Команды (локально, из корня)
 1. `godot --headless --path . --import` — обновить кэш классов (после добавления `class_name`).
 2. `godot --headless --path . -s tests/test_all.gd` — юнит-тесты систем (exit 0 = pass).
-3. `godot --headless --path . -s tests/test_integration.gd` — интеграция: UI-хуки, сейв между «сессиями», report.
-4. `godot --headless --path . --quit-after 3` — smoke-запуск главной сцены.
+3. `godot --headless --path . -s tests/test_integration.gd` — интеграция: UI-хуки, сейв между «сессиями», отчёт, сброс прогресса, аудио.
+4. `godot --headless --path . -s tests/test_regressions.gd` — регрессии: дробное игровое время, атомарный сейв, битые вложенные данные, инвентарь.
+5. `godot --headless --path . --quit-after 3` — smoke-запуск главной сцены.
 
 ## Покрытие
 - Память: консолидация, cap краткосрочной, recall по важности.
@@ -14,6 +15,8 @@
 - Расписание/часы/эмоции: смена суток, hour rollover, mood по контексту, anger не стирается.
 - Perf-бюджет: 2000 операций памяти + recall < 200 мс (headless).
 - Монетизация/anti-cheat: дубликаты предметов, обход анлоков, валюта.
+- UI/визуал: 3-колоночная сетка действий, живой текст журнала, empty-state hint, 1080×1920 store capture, collision-safe карта.
+- Форматы повреждённых данных: valid-JSON non-array и malformed entries в отчётах, неизвестная версия сейва, BBCode-имя.
 
 ## Android (вручную/на устройстве)
 - `adb install` debug APK; профиль: Godot Profiler → FPS ≥ 30 на mid-range ( Snapdragon 6-series / A15 ).
