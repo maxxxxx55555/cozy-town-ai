@@ -18,6 +18,8 @@
 
 9. **Контент для стримеров/ютуберов:** добавлены `docs/STREAMER_GUIDE.md` (сцены, интерактив для чата, кайды), `docs/WALKTHROUGH.md` (пошаговый сценарий от Дня 1 до Дня 7), ссылки в `docs/RELEASE_CHECKLIST.md`.
 
+10. **Активы для генерации/концепт-арт:** `concept.svg` (SVG-концепт городка, открывается в браузере), `docs/IMAGE_PROMPT.md` (промпты для Midjourney/DALL·E/Stable Diffusion/Flux).
+
 ## Честные оставшиеся блокеры
 - Локально отсутствует `android_source.zip`/полный export template, поэтому AAB на этой машине не собран.
 - Успешный GitHub Actions artifact для текущих изменений и загрузка в Google Play Console не подтверждены.
