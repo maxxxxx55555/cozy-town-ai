@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <rect width="960" height="540" fill="#ffd89b"/>
+  <circle cx="790" cy="95" r="48" fill="#fff3b0" opacity="0.95"/>
+  <polygon points="0,260 170,170 340,250 520,150 720,245 960,175 960,300 0,300" fill="#81c784" opacity="0.85"/>
+  <rect y="300" width="960" height="240" fill="#7cb342"/>
+  <path d="M-20 455 C150 410, 260 505, 420 455 S720 390, 980 450 L980 500 C760 455, 620 525, 430 495 S160 455, -20 505 Z" fill="#4fc3f7" opacity="0.9"/>
+  <text x="480" y="270" text-anchor="middle" font-family="monospace" font-size="24" fill="#3e2723">Пазл из Жизни</text>
+</svg>
