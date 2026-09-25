@@ -1,3 +1,9 @@
+## wave 13 (финал) — 2026-09-25
+- Добавлено: `docs/STREAMER_GUIDE.md`, `docs/WALKTHROUGH.md`, `docs/SECURITY.md`.
+- Исправлено: security history audit (plaintext-пароль в git history задокументирован, ротация keystore в чек-листе).
+- Проверено: 87 unit + 43 integration + 25 regression + smoke + GUI smoke + import + leak audit (0 leaks).
+- Результат: `b2b7904` pushed to `origin/main`, рабочее дерево чистое.
+
 # progress.md — журнал сессии
 
 ## Волна 12 (визуальный полиш и robustness)
