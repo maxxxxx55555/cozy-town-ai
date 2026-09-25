@@ -16,6 +16,8 @@
 - **Критично для релиза:** в истории репозитория (старые коммиты `0f2a383`, `73f09aa`, `071bebb`, `fa8d0a3`, `efa416b`, `dc3056b`) plaintext-пароль `puzzle123` хранится в `tools/patch_local_secrets.ps1`. Он остаётся в git history даже после удаления из текущего коммита.
 - **Обязательно перед публикацией:** создай новый release keystore, задай новый alias/password, обнови GitHub Secrets, отозвай старый keystore, удали старые коммиты с паролем (BFG/filter-branch) или примите, что история остаётся открытой.
 
+9. **Контент для стримеров/ютуберов:** добавлены `docs/STREAMER_GUIDE.md` (сцены, интерактив для чата, кайды), `docs/WALKTHROUGH.md` (пошаговый сценарий от Дня 1 до Дня 7), ссылки в `docs/RELEASE_CHECKLIST.md`.
+
 ## Честные оставшиеся блокеры
 - Локально отсутствует `android_source.zip`/полный export template, поэтому AAB на этой машине не собран.
 - Успешный GitHub Actions artifact для текущих изменений и загрузка в Google Play Console не подтверждены.
