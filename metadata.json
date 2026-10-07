@@ -1,0 +1,6 @@
+{
+  "name": "Пазл из Жизни",
+  "description": "Уютный симулятор городка с AI-персонажами, памятью и сплетнями.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
