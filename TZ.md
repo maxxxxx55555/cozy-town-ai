@@ -1,84 +1,85 @@
-# ТЗ — «Пазл из Жизни» (Puzzle of Life), Android / Google Play
-Версия: 1.0 (MVP). Волна 10. Полное продуктовое описание — в GDD.md.
+# ТЗ — «Пазл из Жизни» (Puzzle of Life) 2.0, Android / Google Play
+Полное продуктовое описание — GDD.md. Версия итерации: 2.0 (переработка геймплея и UI).
 
 ## 1. Стек и архитектура
-- Godot 4.7.stable, GDScript (без C#/GDExtension), mobile renderer, 2D.
-- Офлайн-игра: no INTERNET, no аналитика, no сторонние SDK в MVP.
-- Тесты: собственный headless-харнесс (SceneTree-скрипты), exit 0 = pass.
+- Kotlin 2.2.10, Jetpack Compose (Material 3, BOM 2024.09), AGP 9.1, Gradle 9.x, JDK 21.
+- Монолитное Android-приложение; логика игры — чистый Kotlin без Android-зависимостей (важно для тестов).
+- Офлайн: без INTERNET, без аналитики, без сторонних SDK.
+- Тесты: JUnit4 (Gradle) и headless-прогон ядра скриптом `tools/harness/build_core.sh`.
 
-### Файлы
-| Файл | Назначение |
+### Структура кода
+| Путь | Назначение |
 |---|---|
-| project.godot | конфиг: имя, иконка res://assets/icon.png, 1080×1920 портрет, mobile, ETC2/ASTC |
-| scenes/main.tscn | главная сцена (Control, game.gd) |
-| scripts/game.gd | ядро экрана, UI, хуки 0:30/5:00, автосейв, SFX, privacy-панель |
-| scripts/npc.gd | NPC: память+характер+расписание+реакции+сплетни |
-| scripts/npc_memory.gd | краткосрочная/долговременная память, консолидация, капы |
-| scripts/npc_identity.gd | traits, mood, trust, отношения |
-| scripts/schedule.gd | расписание дня (час → место/занятие) |
-| scripts/gossip.gd | реплики сплетен |
-| scripts/dialogue_composer.gd | процедурные реплики (память+характер+место+mood) |
-| scripts/llm_dialogue.gd | опциональные LLM-диалоги (выключены; фильтры, payload) |
-| scripts/save_game.gd | сейв JSON+SHA-256, версия, санитайз, whitelist анлоков |
-| scripts/inventory.gd | инвентарь с защитой от ≤0 и дублей |
-| scripts/daily_ritual.gd | дневные цели, награда, сброс |
-| scripts/game_clock.gd | игровое время, кламп speedhack |
-| scripts/report_service.gd | in-app report (≤50 записей, ≤1000 символов) |
-| scripts/town_map.gd | карта городка: NPC по расписанию, цвет = mood |
-| tests/test_all.gd | юнит-тесты (SceneTree) |
-| tests/test_integration.gd | интеграция UI-хуков, сейв между сессиями, report, audio, privacy |
-| tools/ | gen_sfx.ps1, gen_music.py, gen_store_art.ps1, capture_screens.gd, fetch_templates.py, install_android_template.ps1, patch_local_secrets.ps1 |
-| export_presets.cfg | Android preset: AAB, API 36, custom build, arm64+armeabi-v7a |
-| .github/workflows/android-aab.yml | CI: импорт шаблонов, тесты, экспорт AAB, артефакт |
+| `core/GameEngine.kt` | Ядро: время, день/сутки, действия, заказы, квесты, осколки, оффлайн, сейв-состояние |
+| `core/Content.kt` | Контент: предметы, места, рецепты, апгрейды, достижения, пул целей, заказы, квесты, события, строки |
+| `core/Player.kt` | Уровень/опыт, силы, серия дней |
+| `core/Rng.kt` | Детерминированный ГПСЧ (сериализуемое состояние) |
+| `core/SaveCore.kt` | Санитизация, SHA-256, кодирование/декодирование, миграция v1/v2 → v3 |
+| `core/Views.kt` | Неизменяемые снимки для UI (NpcView, RequestView, …) |
+| `model/*.kt` | NPC, память, характер, расписание, инвентарь, часы, дневные цели, диалоги |
+| `storage/SaveGame.kt` | Файл сейва: tmp → файл → .bak, валидация checksum и версии |
+| `storage/ReportService.kt` | Локальные отчёты (≤50 шт, ≤1000 символов) |
+| `ui/GameScreen.kt` | Экран: шапка, событие дня, 6 вкладок, журнал, диалоги (интро, подарок, мозаика, данные, отчёт) |
+| `ui/TownMapCanvas.kt` | Карта городка: 9 мест, 6 NPC, тапы, настроение кольцом |
+| `ui/GameViewModel.kt` | Состояние UI, тикер 1 с = 1 игровая минута, звуки, автосейв |
+| `audio/AudioManager.kt` | MediaPlayer (тема) + SoundPool (SFX) |
+| `app/src/test/.../EngineTestCases.kt` | 30 тест-кейсов ядра (общие для JUnit и headless) |
+| `tools/harness/` | Сборка ядра и прогон тестов без Android SDK/Gradle |
 
 ## 2. Команды (DoD-верификация)
-```
-godot --headless --path . --import
-godot --headless --path . -s tests/test_all.gd          # 87 PASS, exit 0
-godot --headless --path . -s tests/test_integration.gd  # 43 PASS, exit 0
-godot --headless --path . -s tests/test_regressions.gd # 25 PASS, exit 0
-godot --headless --path . --quit-after 3                # smoke: exit 0
-godot --path . -s tools/capture_screens.gd --resolution 1080x1920
-godot --headless --path . --export-release "Android" build/game.aab
+```bash
+gradle :app:testDebugUnitTest     # JUnit: 30 тестов ядра (1 обёртка на кейс)
+gradle :app:assembleDebug         # debug APK
+gradle :app:bundleRelease         # AAB для Google Play (нужен keystore)
+bash tools/harness/build_core.sh  # headless: 30 PASS/FAIL + строка BALANCE
 ```
 
-## 3. Android / Google Play (требования)
-- Target SDK = 36 (Android 16) — обязательно для новых приложений с 31.08.2026.
-- Формат релиза: только .AAB (APK — локальные тесты).
-- Use Custom Build = ON; ABI: arm64-v8a + armeabi-v7a.
-- Play App Signing: включён в Console; upload keystore — release.keystore (не в git).
-- Плагин GodotGooglePlayBilling v8.3.0+ — только если появится IAP (v1.1), Android v2 plugin system (AAR+Gradle).
-- AI-generated content: сейчас декларация «не используется» (текст процедурный); при включении LLM — text generation + фильтры + report.
-- Data Safety: «No data collected / No data shared» для MVP (офлайн, без сети).
-- In-app report: кнопка «Сообщить» — реализована.
-- Store listing: иконка 1024×1024, feature 1024×500, ≥6 скриншотов, описание с хуком (docs/ASO.md).
+## 3. Правила и баланс (проверяются тестами)
+- Энергия: сбор 1, помощь 2, крафт 1; максимум = 10 + (уровень−1)/2 + бонусы апгрейдов; реген 1/2 игровых часа.
+- Анти-спам: разговор с тем же жителем засчитывается не чаще 1 раза в 15 игровых минут.
+- Разговор/помощь возможны только в том месте, где житель находится по расписанию.
+- Подарки: любимое +0.25 доверия, приятное +0.15, прочее +0.05.
+- Заказы: 3 в день, награда 15–24 монет (×1.5 в базарный день и с ярмаркой), +1 осколок за первый заказ дня.
+- Цели дня: 25 монет + 10 опыта, один раз в день.
+- Экономика: продажа предметов 2–28 монет, апгрейды 60–250, мозаика — 60 осколков.
 
-## 4. Безопасность и red team (покрыто тестами)
-1. Tampered save (изменённый data при старом checksum) → отклонён.
-2. Сейв из «будущей» версии → отклонён.
-3. Монеты 1e9 → кап 999 999; отрицательные → 0.
-4. Отрицательные/нулевые предметы → отброшены; вычитание больше остатка → запрещено.
-5. Обход анлоков (неизвестные id, дубли) → whitelist.
-6. trust=99 / relationship=42 / чужой mood → кламп |1.0| / дефолт neutral.
-7. Speedhack/сон: 100 000 сек в кадре → кламп 600 сек, дни не перематываются.
-8. Спам целей и сплетен → кулдаун 5 сек, дедуп сплетен за день, кап долгой памяти 200.
-9. Потолок журнала UI 300 строк (анти-утечка памяти).
+## 4. Регресс и анти-чит (покрыто тестами)
+1. Повторный ввод имени не перезаписывает память NPC.
+2. Сбор невозможен без сил; шторм блокирует причал.
+3. Нельзя помочь/поговорить с жителем не в его локации.
+4. Спам-разговоры не дают опыт/счётчики/цели.
+5. Покупка апгрейда без монет/повторно — отклоняется; открытие новых мест только через апгрейд.
+6. Осколки ограничены 60, монеты — капом, память ограничена, журнал ≤300 строк.
+7. Торговец: не более 1 жемчуга и 1 янтаря в день, только в событие «торговец».
+8. Отдых — раз в игровой день.
+9. Сейв: подмена данных меняет checksum → файл отклоняется; версия из будущего не читается.
+10. Миграция сейва v2 сохраняет имя, монеты, день, время, инвентарь, музыку.
 
 ## 5. Производительность
-- Прокси-бюджет: 200 NPC × 10 кадров (tick + карта) < 50 мс — фактически ~10–20 мс.
-- Целевой FPS на mid-range: ≥ 30 (проверка на устройстве — в релизном чек-листе).
+- Тик 1 раз в секунду; тяжёлые выборки (NPC/рецепты/заказы/апгрейды/достижения) пересчитываются только
+  при изменении монет/уровня или действий (флаг heavy), иначе обновляется лёгкая часть (время, силы, цели).
+- Полный движок (6 NPC, 9 мест, 300 строк журнала) на desktop JVM: 30 тестов + 3 игровых дня симуляции ≈ 1.5 с.
+- Целевой FPS: ≥ 30 на mid-range, без аллокаций в Canvas-цикле (карта рисуется из снимков View-моделей).
 
-## 6. Definition of Done (релиз)
-- [x] GDD/TZ/ASO/PRIVACY/PLAY_COMPLIANCE/MONETIZATION/TESTING актуальны
-- [x] Unit + integration + regression тесты и smoke проходят локально (87/42/25 PASS)
-- [x] Android preset: API 36, AAB, custom build, обе ABI, launcher icon 1024×1024
-- [x] Keystore создан, секреты вне git, скрипт инъекции в preset
-- [x] CI-workflow для сборки AAB и запуска unit/integration/regression
-- [ ] AAB собран локально (блокер: нет export templates, 1279 МБ, сеть ~19 КБ/с)
-- [ ] Загрузка в Play Console, Play App Signing, AI/Data Safety формы, релиз 100%
-- [ ] Device QA: FPS ≥ 30, сворачивание/возврат, отсутствие INTERNET-разрешений
+## 6. Google Play (требования)
+- Target SDK 36, формат релиза AAB; launcher icon (mipmap), portrait-lock, edge-to-edge.
+- Data Safety: данные не собираются и не передаются (офлайн).
+- In-app report: кнопка «Сообщить» — реализована (локально).
+- AI-generated content: текст процедурный, декларация «не используется».
+- ASO: тексты в docs/ASO.md, иконка 1024×1024, feature 1024×500, ≥6 скриншотов.
 
-## 7. Известные ограничения
-- Текстовая (кодовая) графика поверх подключённых пиксельных спрайтов; нет пока полноценной покадровой анимации.
-- Один сейв-слот; нет облачных сохранений.
-- Локализация только RU.
+## 7. Definition of Done (итерация 2.0)
+- [x] Новый геймплей: энергия, крафт, подарки, заказы, квесты-арки, достижения, апгрейды, события, мозаика
+- [x] Переработанный UI: 6 вкладок, карта с тапами, журнал, диалоги, тосты
+- [x] Сейв v3 с миграцией v1/v2 и защитой целостности
+- [x] 30 тестов ядра, включая симуляцию трёх дней (BALANCE-отчёт)
+- [x] Документы обновлены (GDD, TZ, README, TESTING, WALKTHROUGH, ASO, RELEASE_CHECKLIST)
+- [x] CI: юнит-тесты + debug APK (`.github/workflows/android.yml`)
+- [ ] Локальная сборка APK на машине разработчика (нужен Android SDK + Gradle; в песочнице нет)
+- [ ] Device QA: FPS, сворачивание/возврат, отсутствие INTERNET-разрешений
+- [ ] Загрузка AAB в Play Console
+
+## 8. Известные ограничения
+- Один сейв-слот, только RU-локаль.
+- Пиксель-арт статичный (нет покадровых анимаций), карта — 2D-схема городка.
+- Облачных LLM-диалогов нет: тексты процедурные, но зависят от памяти, доверия, места, события дня.

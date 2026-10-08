@@ -1,44 +1,37 @@
-# RELEASE CHECKLIST — «Пазл из Жизни» (шаги, которые нужны от владельца)
+# RELEASE_CHECKLIST — «Пазл из Жизни» 2.0
 
-## A. Сборка AAB (единственный технический блокер)
-На машине разработки нет export templates: GitHub отдаёт ~19 КБ/с, Range-запросы не работают,
-зеркала (tuna/ustc/ghproxy*/ddlc/ghfast/llkk) недоступны → 1279 МБ скачать нельзя.
+## Код и тесты
+- [x] Чистое ядро без Android-зависимостей (`core/`, `model/`)
+- [x] 30 тест-кейсов, включая симуляцию трёх дней (BALANCE-отчёт)
+- [x] Сейв v3: checksum, tmp+`.bak`, восстановление, миграция v1/v2
+- [x] Анти-спам и анти-чит покрыты тестами (разговоры, силы, апгрейды, торговец, осколки)
+- [x] Обновлены GDD / TZ / README / TESTING / WALKTHROUGH / ASO / PLAY_COMPLIANCE
+- [ ] `gradle :app:testDebugUnitTest` на CI без ошибок (workflow `android.yml`)
+- [ ] `gradle :app:assembleDebug` и ручной прогон на устройстве
 
-Вариант 1 — хорошая сеть/VPN:
-```
-curl -L -o tpl.tpz https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_export_templates.tpz
-python tools/fetch_templates.py extract     # или распаковать вручную
-powershell -File tools/install_android_template.ps1
-powershell -File tools/patch_local_secrets.ps1
-godot --headless --path . --export-release "Android" build/game.aab
-git checkout export_presets.cfg             # убрать секреты из рабочего файла
-```
-Вариант 2 — GitHub Actions: загрузить репозиторий на GitHub, положить секреты
-`ANDROID_KEYSTORE_B64` (base64 release.keystore), `ANDROID_KEYSTORE_USER`, `ANDROID_KEYSTORE_PASSWORD`
-→ workflow `.github/workflows/android-aab.yml` соберёт AAB и выдаст артефакт `game-aab`.
+## Контент (итерация 2.0)
+- [x] 6 жителей: расписания, портреты, любимые подарки, истории из 4 частей
+- [x] 9 мест (включая 2 открываемых), 22 предмета, 8 рецептов
+- [x] 12 улучшений, 28 достижений, 7 событий дня, ротация дневных целей
+- [x] Мозаика городка (60 осколков) с финальной наградой
+- [x] Новые ассеты: спрайты Осипа и Сони, сад, маяк, картина мозаики, фон/иконки
 
-Вариант 3 — любой компьютер с нормальной сетью: `godot --headless --path . --export-release "Android" build/game.aab`.
+## Play Console (ручные шаги)
+- [ ] Создать/обновить приложение, загрузить AAB (`gradle :app:bundleRelease`)
+- [ ] Data Safety: «данные не собираются / не передаются»
+- [ ] App content: AI-generated content — «не используется» (тексты процедурные)
+- [ ] Возрастной рейтинг 3+, без покупок и рекламы
+- [ ] Листинг: иконка 512×512, feature graphic 1024×500, ≥6 скриншотов 2.0, описания из docs/ASO.md
+- [ ] Внутреннее тестирование → production
 
-## B2. Контент для стримеров/ютуберов
-- Подготовь materials: `docs/STREAMER_GUIDE.md`, 6 store-скриншотов (`assets/store/real_*.png`, 1080×1920), иконку 1024×1024.
-- Ключевые сцены: представление → сплетня → воспоминание на следующий день.
-- Hook: «Жители помнят тебя и сплетничают за твоей спиной».
+## Перед релизом (безопасность)
+- [ ] Release keystore: новый (старый пароль из истории репозитория не использовать), секреты вне git
+- [ ] Проверить, что в `save.json` не попадают лишние данные, а права приложения пусты
+- [ ] Прогнать `aapt dump permissions` по APK — INTERNET отсутствует
 
-## B. Play Console (ручные шаги)
-1. Создать приложение «Пазл из Жизни», язык RU, тип Game, бесплатное.
-2. App content:
-   - Privacy policy → разместить docs/PRIVACY.md по URL (напр. GitHub Pages) и вставить ссылку.
-   - Ads: нет рекламы.
-   - AI-generated content: «No» (текст процедурный). После включения LLM — «Yes → text generation».
-   - Data safety: No data collected / No data shared.
-   - Target audience: 13+ или 3+ (в FAQ указать отсутствие сбора данных).
-3. Store listing: название, короткое/полное описание (docs/ASO.md), иконка 1024×1024,
-   feature graphic 1024×500, 6 скриншотов (assets/store/real_*.png).
-4. Upload AAB → Play App Signing (по умолчанию) → internal testing track → device QA.
-5. QA на устройстве: FPS ≥ 30 (Profiler), сворачивание/возврат (сохранение на паузе),
-   отсутствие INTERNET-разрешений, размер и время запуска.
-6. Production rollout: 20% → 100%; следить за vitals (ANR/crash-free ≥ 99%).
-
-## C. Что уже сделано и проверено в репозитории
-- Код, unit/integration/regression автотесты, smoke, скриншоты, ASO-ассеты, спрайты NPC/мест, фоновая музыка, privacy-панель, пользовательский отчёт, сброс прогресса, сейв с checksum/backup, дневные цели, карта, SFX, CI-workflow и скрипты сборки.
-- Exact test count: запускать `tests/test_all.gd`, `tests/test_integration.gd`, `tests/test_regressions.gd`; текущий локальный pipeline завершается успешно.
+## QA на устройстве
+- [ ] FPS ≥ 30, прокрутка вкладок, тапы по карте
+- [ ] Ввод имени: клавиатура не перекрывает поле (adjustResize + edge-to-edge)
+- [ ] Сворачивание/возврат: автосейв, музыка, восстановление сил, приветствие «пока тебя не было»
+- [ ] Перезапуск процесса: имя, монеты, день, доверие, апгрейды на месте
+- [ ] Долгая сессия (≥20 минут): журнал не растёт бесконечно (300 строк), память не течёт

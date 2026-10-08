@@ -4,15 +4,19 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.cozytown.audio.AudioManager
-import com.aistudio.cozytown.model.DailyRitual
-import com.aistudio.cozytown.model.DaySchedule
-import com.aistudio.cozytown.model.DialogueComposer
-import com.aistudio.cozytown.model.GameClock
-import com.aistudio.cozytown.model.Inventory
-import com.aistudio.cozytown.model.NPC
-import com.aistudio.cozytown.model.NPCIdentity
-import com.aistudio.cozytown.model.NPCMemory
-import com.aistudio.cozytown.storage.GameSaveState
+import com.aistudio.cozytown.core.AchievementView
+import com.aistudio.cozytown.core.GameEngine
+import com.aistudio.cozytown.core.ItemView
+import com.aistudio.cozytown.core.Items
+import com.aistudio.cozytown.core.NpcView
+import com.aistudio.cozytown.core.PUZZLE_TOTAL
+import com.aistudio.cozytown.core.Places
+import com.aistudio.cozytown.core.RecipeView
+import com.aistudio.cozytown.core.RequestView
+import com.aistudio.cozytown.core.SaveCodec
+import com.aistudio.cozytown.core.TownEvents
+import com.aistudio.cozytown.core.UpgradeView
+import com.aistudio.cozytown.core.GoalView
 import com.aistudio.cozytown.storage.ReportService
 import com.aistudio.cozytown.storage.SaveGame
 import kotlinx.coroutines.Job
@@ -24,33 +28,82 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-data class JournalEntry(
-    val id: Long,
-    val text: String,
-    val isSystem: Boolean = false,
-    val isHighlight: Boolean = false,
-    val isRecall: Boolean = false
+data class PlaceChip(
+    val id: String,
+    val name: String,
+    val emoji: String,
+    val locked: Boolean,
+    val here: Boolean,
+    val npcCount: Int
 )
 
 data class GameUiState(
     val day: Int = 1,
-    val timeString: String = "День 1, 08:00",
+    val timeString: String = "08:00",
     val hour: Int = 8,
     val coins: Int = 0,
+    val level: Int = 1,
+    val xp: Int = 0,
+    val xpNeed: Int = 60,
+    val energy: Int = 10,
+    val maxEnergy: Int = 10,
+    val streak: Int = 0,
+    val shards: Int = 0,
+    val puzzleTotal: Int = PUZZLE_TOTAL,
+
     val playerName: String = "",
     val nameInputText: String = "",
     val isNameSubmitted: Boolean = false,
-    val journalLines: List<JournalEntry> = emptyList(),
-    val journalHint: String = "Подсказка: введи имя — все жители городка его запомнят.",
-    val emptyJournalHint: String = "Здесь появится история городка.\nПознакомься с жителями — и начнётся.",
+    val isIntroVisible: Boolean = true,
+
+    val tab: Int = 0,
+    val currentPlaceId: String = "площадь",
+    val currentPlaceName: String = "Площадь",
+    val currentPlaceFlavor: String = "",
+    val places: List<PlaceChip> = emptyList(),
+
+    val eventId: String = TownEvents.NONE,
+    val eventName: String = "",
+    val eventText: String = "",
+    val eventActionLabel: String? = null,
+
+    val npcs: List<NpcView> = emptyList(),
+    val npcsHere: List<NpcView> = emptyList(),
+    val items: List<ItemView> = emptyList(),
+    val recipes: List<RecipeView> = emptyList(),
+    val requests: List<RequestView> = emptyList(),
+    val upgrades: List<UpgradeView> = emptyList(),
+    val achievements: List<AchievementView> = emptyList(),
+    val goals: List<GoalView> = emptyList(),
+    val goalsClaimed: Boolean = false,
+    val questsDone: Int = 0,
+    val questsTotal: Int = 0,
+    val achievementsDone: Int = 0,
+    val achievementsTotal: Int = 0,
+    val itemsTotal: Int = 0,
+
+    val journal: List<String> = emptyList(),
+    val journalExpanded: Boolean = false,
+
     val isMusicEnabled: Boolean = true,
     val isPrivacyDialogOpen: Boolean = false,
     val isReportDialogOpen: Boolean = false,
-    val reportSubmittedMessage: String? = null,
-    val ritualStatusText: String = "",
-    val allRitualsDone: Boolean = false,
-    val selectedNpc: NPC? = null,
-    val npcs: List<NPC> = emptyList()
+    val isPuzzleDialogOpen: Boolean = false,
+    val giftTarget: String? = null,
+    val pickTargetFor: String? = null,
+    val giftTargetLoved: List<String> = emptyList(),
+    val toast: String? = null,
+
+    val nextHint: String = "",
+    val tabBadges: List<Int> = listOf(0, 0, 0, 0, 0, 0),
+
+    val raresFound: Int = 0,
+    val giftsGiven: Int = 0,
+    val craftsMade: Int = 0,
+    val gathersMade: Int = 0,
+    val petsMade: Int = 0,
+    val storyLines: List<String> = emptyList(),
+    val upgradeIds: List<String> = emptyList()
 )
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
@@ -59,305 +112,420 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val reportService = ReportService(application)
     val audioManager = AudioManager(application)
 
-    private val clock = GameClock()
-    private val ritual = DailyRitual()
-    private val inventory = Inventory()
-    private val npcsList = mutableListOf<NPC>()
+    val engine = GameEngine(seed = System.currentTimeMillis() and 0xFFFFFF)
 
-    private var sessionTime: Float = 0f
-    private var autosaveTime: Float = 0f
-    private var recallShown: Boolean = false
-    private var lastTalkTime: Float = -999f
-    private var lastRitualLog: String = ""
-    private var nextEntryId: Long = 0
+    private var tickerJob: Job? = null
+    private var autosaveTime = 0f
+    private var heavyDirty = true
+    private var lastCoins = 0
+    private var lastLevel = 1
+    private var lastAchievements = 0
+    private var lastUpgrades = 0
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
-    private var tickerJob: Job? = null
-
     companion object {
-        const val RECALL_DELAY_SEC = 300.0f
-        const val AUTOSAVE_SEC = 30.0f
-        const val TALK_COOLDOWN = 5.0f
-        const val MAX_LOG_LINES = 300
+        const val AUTOSAVE_SEC = 20f
+        const val MAX_JOURNAL_SHOWN = 200
     }
 
     init {
-        spawnTown()
-        loadGame()
-        if (ritual.resetForDay(clock.day)) {
-            logRitual()
+        val loaded = loadGame()
+        if (!loaded) {
+            engine.newGame()
+        } else {
+            engine.onLoaded(System.currentTimeMillis())
         }
-        updateIntro()
-        updateUiState()
-        audioManager.setMusicEnabled(_uiState.value.isMusicEnabled)
+        audioManager.setMusicEnabled(engine.musicEnabled)
+        lastCoins = engine.coins
+        lastLevel = engine.player.level
+        lastAchievements = engine.achievements.size
+        lastUpgrades = engine.upgrades.size
+        refresh(heavy = true)
         startTicker()
-    }
-
-    private fun spawnTown() {
-        npcsList.clear()
-
-        // Marta
-        val marta = NPC(
-            identity = NPCIdentity(
-                npcName = "Марта",
-                traits = listOf("добрая", "болтливая")
-            ),
-            memory = NPCMemory(),
-            schedule = DaySchedule().apply {
-                addSlot(8, "пекарня", "печёт хлеб")
-                addSlot(13, "рынок", "покупает цветы")
-                addSlot(18, "площадь", "гуляет")
-            }
-        )
-        npcsList.add(marta)
-
-        // Boris
-        val boris = NPC(
-            identity = NPCIdentity(
-                npcName = "Борис",
-                traits = listOf("ворчливый")
-            ),
-            memory = NPCMemory(),
-            schedule = DaySchedule().apply {
-                addSlot(9, "мастерская", "чинит вещи")
-                addSlot(19, "таверна", "читает газету")
-            }
-        )
-        npcsList.add(boris)
-
-        // Luka
-        val luka = NPC(
-            identity = NPCIdentity(
-                npcName = "Лука",
-                traits = listOf("мечтательный", "тихий")
-            ),
-            memory = NPCMemory(),
-            schedule = DaySchedule().apply {
-                addSlot(10, "причал", "ловит рыбу")
-            }
-        )
-        npcsList.add(luka)
-
-        // Anya
-        val anya = NPC(
-            identity = NPCIdentity(
-                npcName = "Аня",
-                traits = listOf("энергичная", "любопытная")
-            ),
-            memory = NPCMemory(),
-            schedule = DaySchedule().apply {
-                addSlot(7, "рынок", "торгует цветами")
-                addSlot(20, "площадь", "танцует")
-            }
-        )
-        npcsList.add(anya)
     }
 
     private fun startTicker() {
         tickerJob?.cancel()
         tickerJob = viewModelScope.launch {
             while (isActive) {
-                delay(1000L) // 1 real second = 1 game minute
-                tick(1.0f)
+                delay(1000L) // 1 реальная секунда = 1 игровая минута
+                engine.tick(1f)
+                autosaveTime += 1f
+                if (autosaveTime >= AUTOSAVE_SEC) {
+                    autosaveTime = 0f
+                    saveGame()
+                }
+                if (engine.coins != lastCoins || engine.player.level != lastLevel) {
+                    heavyDirty = true
+                }
+                refresh(heavy = heavyDirty)
             }
         }
     }
 
-    private fun tick(delta: Float) {
-        sessionTime += delta
-        autosaveTime += delta
-        clock.advance(delta)
+    // ------------------------------------------------------------------ refresh
+    private fun refresh(heavy: Boolean) {
+        val e = engine
+        val place = Places.byId(e.currentPlace)
+        val views = if (heavy) e.npcViews() else _uiState.value.npcs
+        val event = TownEvents.byId(e.eventId)
+        val here = views.filter { it.isHere }
 
-        for (npc in npcsList) {
-            npc.tick(clock.hour())
+        if (heavy) {
+            heavyDirty = false
+            lastAchievements = e.achievements.size
         }
 
-        if (ritual.resetForDay(clock.day)) {
-            lastRitualLog = ""
-            logMessage("День ${clock.day}. Цели обновлены.", isSystem = true)
-            logRitual()
-            updateJournalHint()
+        val chips = Places.ALL.map { p ->
+            PlaceChip(
+                id = p.id,
+                name = p.name,
+                emoji = placeEmoji(p.id),
+                locked = p.requiresUpgrade != null && p.requiresUpgrade !in e.upgrades,
+                here = p.id == e.currentPlace,
+                npcCount = views.count { it.place == p.id }
+            )
         }
 
-        if (!recallShown && sessionTime >= RECALL_DELAY_SEC) {
-            showRecall()
+        _uiState.update { st ->
+            st.copy(
+                day = e.clock.day,
+                timeString = "%02d:%02d".format(e.clock.hour(), e.clock.minute()),
+                hour = e.clock.hour(),
+                coins = e.coins,
+                level = e.player.level,
+                xp = e.player.xp,
+                xpNeed = e.player.xpNeed(),
+                energy = e.player.energy,
+                maxEnergy = e.player.maxEnergy(),
+                streak = e.player.streak,
+                shards = e.shards,
+                playerName = e.playerName,
+                isNameSubmitted = e.playerName.isNotEmpty(),
+                isIntroVisible = e.playerName.isEmpty(),
+                currentPlaceId = e.currentPlace,
+                currentPlaceName = place?.name ?: e.currentPlace,
+                currentPlaceFlavor = place?.flavor ?: "",
+                places = chips,
+                eventId = e.eventId,
+                eventName = event?.name ?: "",
+                eventText = event?.log ?: "",
+                eventActionLabel = when {
+                    e.eventId == "cat_visit" && e.pettedDay != e.clock.day -> "Погладить кота"
+                    e.eventId == "merchant" -> "К торговцу"
+                    else -> null
+                },
+                npcs = views,
+                npcsHere = here,
+                items = if (heavy) e.itemViews() else st.items,
+                recipes = if (heavy) e.recipeViews() else st.recipes,
+                requests = if (heavy) e.requestViews() else st.requests,
+                upgrades = if (heavy) e.upgradeViews() else st.upgrades,
+                achievements = if (heavy) e.achievementViews() else st.achievements,
+                goals = e.goalViews(),
+                goalsClaimed = e.ritual.claimed,
+                questsDone = e.counters.questsDone,
+                questsTotal = 6,
+                achievementsDone = e.achievements.size,
+                achievementsTotal = e.achievementViews().size,
+                itemsTotal = e.inventory.items.values.sum(),
+                journal = e.journal.takeLast(MAX_JOURNAL_SHOWN).map { lineText(it) },
+                isMusicEnabled = e.musicEnabled,
+                nextHint = if (heavy) nextHint(e) else st.nextHint,
+                tabBadges = if (heavy) computeBadges(e) else st.tabBadges,
+                raresFound = if (heavy) e.counters.rares else st.raresFound,
+                giftsGiven = if (heavy) e.counters.gifts else st.giftsGiven,
+                craftsMade = if (heavy) e.counters.crafts else st.craftsMade,
+                gathersMade = if (heavy) e.counters.gathers else st.gathersMade,
+                petsMade = if (heavy) e.counters.pets else st.petsMade,
+                storyLines = if (heavy) storyLines(e, views) else st.storyLines,
+                upgradeIds = if (heavy) e.upgrades.toList() else st.upgradeIds
+            )
         }
+    }
 
-        if (autosaveTime >= AUTOSAVE_SEC) {
-            autosaveTime = 0f
+    /** Подсказка «что делать дальше» — чтобы игрок никогда не терялся. */
+    private fun nextHint(e: GameEngine): String {
+        if (e.playerName.isEmpty()) return "Введи имя — его запомнят все жители."
+        if (e.requestViews().any { it.canDo }) {
+            val r = e.requestViews().first { it.canDo }
+            return "Заказ ${r.npc} готов: ${r.itemName} ×${r.need} — загляни в «Дела»."
+        }
+        val readyQuest = e.npcViews().firstOrNull { it.questReady }
+        if (readyQuest != null) return "У ${readyQuest.name} готова часть истории ($readyQuest.questTitle)."
+        if (e.ritual.allDone() && !e.ritual.claimed) return "Цели дня выполнены — забери 25 монет в «Делах»."
+        val undoneGoal = e.goalViews().firstOrNull { !it.done }
+        if (undoneGoal != null) return "Цель дня: ${undoneGoal.text} (${undoneGoal.current}/${undoneGoal.target})."
+        val affordable = e.upgradeViews().firstOrNull { !it.owned && it.affordable }
+        if (affordable != null) return "Хватает монет на «${affordable.name}» — раздел «Город»."
+        if (e.player.energy == 0) return "Силы на исходе: отдохни в доме или загляни позже."
+        return "Собери ресурсы, поговори с жителями или помоги кому-нибудь."
+    }
+
+    /** Личная история игрока в городке — то, чем приятно поделиться. */
+    private fun storyLines(e: GameEngine, views: List<NpcView>): List<String> {
+        val friends = views.filter { it.tier >= 1 }.sortedByDescending { it.trust }
+        val friendNames = friends.take(3).joinToString(", ") { "${it.name} (${it.tierName.lowercase()})" }
+        val topItem = e.inventory.items.entries
+            .mapNotNull { (id, cnt) -> Items.byId(id)?.let { def -> def to cnt } }
+            .maxByOrNull { it.first.rarity * 100 + it.second }
+        return listOf(
+            "День ${e.clock.day}, серия ${e.player.streak} дн., уровень ${e.player.level}.",
+            "Друзья: " + (friendNames.ifEmpty { "пока только знакомые — подари кому-нибудь любимый предмет" }),
+            "Историй жителей рассказано: ${e.counters.questsDone} из 6.",
+            "Редких находок: ${e.counters.rares} · подарков: ${e.counters.gifts} · собрано ресурсов: ${e.counters.gathers}.",
+            "В сумке редкость: " + (topItem?.first?.let { "${it.emoji} ${it.name}" } ?: "—"),
+            "Мозаика городка: ${e.shards} из $PUZZLE_TOTAL осколков."
+        )
+    }
+
+    /** Числа-подсказки на вкладках: где сейчас есть готовое действие. */
+    private fun computeBadges(e: GameEngine): List<Int> {
+        val questsReady = e.npcViews().count { it.questReady }
+        val craftable = e.recipeViews().count { it.canCraft }
+        val requestsReady = e.requestViews().count { it.canDo } + if (e.ritual.allDone() && !e.ritual.claimed) 1 else 0
+        val upgradesReady = e.upgradeViews().count { !it.owned && it.affordable }
+        return listOf(0, questsReady, 0, craftable, requestsReady, upgradesReady)
+    }
+
+    private fun lineText(line: com.aistudio.cozytown.core.JournalLine): String {
+        return when {
+            line.highlight -> "★ ${line.text}"
+            line.recall -> "… ${line.text}"
+            else -> line.text
+        }
+    }
+
+    private fun placeEmoji(id: String): String = when (id) {
+        "home" -> "🏠"
+        "пекарня" -> "🥐"
+        "рынок" -> "🧺"
+        "мастерская" -> "🔨"
+        "площадь" -> "⛲"
+        "таверна" -> "🍵"
+        "причал" -> "⛵"
+        "сад" -> "🌱"
+        "маяк" -> "🗼"
+        else -> "📍"
+    }
+
+    /** Звуки и тосты по результату действия. */
+    private fun afterAction(playClick: Boolean = true, prevCoins: Int = -1) {
+        if (playClick) audioManager.playSfx("click")
+        val e = engine
+        if (prevCoins >= 0 && e.coins > prevCoins) audioManager.playSfx("coin")
+        if (e.player.level > lastLevel) {
+            audioManager.playSfx("success")
+            _uiState.update { it.copy(toast = "Уровень ${e.player.level}! Силы восстановлены.") }
             saveGame()
         }
-
-        updateUiState()
-    }
-
-    private fun updateIntro() {
-        if (_uiState.value.playerName.isEmpty()) {
-            logMessage("Марта: Привет! Как тебя зовут?")
-        } else {
-            logMessage("Марта: ${npcsList[0].greet(clock.day)}")
+        if (e.achievements.size > lastAchievements) {
+            audioManager.playSfx("success")
         }
+        val claimed = e.ritual.claimed
+        if (claimed && !_uiState.value.goalsClaimed) {
+            audioManager.playSfx("coin")
+            saveGame()
+        }
+        if (e.upgrades.size != lastUpgrades) {
+            lastUpgrades = e.upgrades.size
+            saveGame()
+        }
+        val lastLine = e.journal.lastOrNull()?.text
+        val milestone = lastLine != null &&
+            (lastLine.startsWith("🏆") || lastLine.startsWith("📖") || lastLine.startsWith("🧩"))
+        if (milestone) {
+            audioManager.playSfx("success")
+            // важные вехи сохраняем сразу, не дожидаясь автосейва
+            saveGame()
+        }
+        lastCoins = e.coins
+        lastLevel = e.player.level
+        lastAchievements = e.achievements.size
+        heavyDirty = true
+        refresh(heavy = true)
     }
 
+    // ------------------------------------------------------------------ действия
     fun onNameChange(text: String) {
         _uiState.update { it.copy(nameInputText = text) }
     }
 
     fun onNameSubmitted() {
-        val sanitized = SaveGame.sanitizeName(_uiState.value.nameInputText)
-        if (sanitized.length < 2 || _uiState.value.isNameSubmitted) {
+        val ok = engine.setName(_uiState.value.nameInputText)
+        if (!ok) {
+            _uiState.update { it.copy(toast = "Имя должно быть от 2 до 24 символов.") }
             return
         }
-        audioManager.playSfx("click")
-        for (npc in npcsList) {
-            npc.memory.playerName = sanitized
-            npc.memory.addEvent("познакомился(ась) с игроком $sanitized", 8, clock.day, aboutPlayer = true)
-        }
-        logMessage("Марта: Запомню, $sanitized! Заходи в гости.")
-        _uiState.update {
-            it.copy(
-                playerName = sanitized,
-                nameInputText = sanitized,
-                isNameSubmitted = true
-            )
-        }
-        updateJournalHint()
+        audioManager.playSfx("success")
+        _uiState.update { it.copy(isIntroVisible = false, tab = 0) }
+        afterAction(playClick = false)
         saveGame()
     }
 
-    fun onTalk() {
-        if (npcsList.isEmpty()) return
+    fun selectTab(index: Int) {
         audioManager.playSfx("click")
-        val npc = npcAtHour(clock.hour())
-        val spot = npc.schedule.placeAt(clock.hour())
-        val dialogue = DialogueComposer.compose(npc, clock.day, clock.hour())
-        logMessage(dialogue)
-        logMessage("${npc.identity.npcName} (${spot.place})", isSystem = true)
-
-        if (sessionTime - lastTalkTime >= TALK_COOLDOWN) {
-            ritual.record("talk")
-            lastTalkTime = sessionTime
-        }
-
-        val others = othersAt(npc, spot.place)
-        if (others.isNotEmpty()) {
-            val other = others[0]
-            val rel = npc.identity.relationships[other.identity.npcName] ?: 0.0f
-            if (rel > 0.5f) {
-                logMessage("${npc.identity.npcName} дружелюбно встречает ${other.identity.npcName}.", isSystem = true)
-            }
-            val gossipLine = npc.gossipWith(other, clock.day)
-            logMessage(gossipLine)
-            if (npc.memory.recallAboutPlayer().isNotEmpty()) {
-                ritual.record("gossip")
-            }
-        }
-        afterEvent()
+        _uiState.update { it.copy(tab = index) }
     }
 
-    fun onHelp() {
-        if (npcsList.isEmpty()) return
-        audioManager.playSfx("click")
-        val npc = npcAtHour(clock.hour())
-        val reaction = npc.reactToAction("помог по хозяйству", 5, clock.day)
-        logMessage("${npc.identity.npcName}: $reaction")
-        ritual.record("kind")
-        afterEvent()
+    fun moveTo(placeId: String) {
+        if (engine.moveTo(placeId)) {
+            audioManager.playSfx("click")
+            afterAction(playClick = false)
+        } else {
+            audioManager.playSfx("click")
+            refresh(heavy = false)
+        }
     }
 
-    private fun afterEvent() {
-        logRitual()
-        val reward = ritual.claim()
-        if (reward > 0) {
-            _uiState.update { it.copy(coins = it.coins + reward) }
-            logMessage("Цели дня выполнены! +$reward монет", isHighlight = true)
-            audioManager.playSfx("coin")
+    fun gather() {
+        val coins = engine.coins
+        engine.gather()
+        afterAction(prevCoins = coins)
+    }
+
+    fun rest() {
+        val coins = engine.coins
+        engine.rest()
+        afterAction(prevCoins = coins)
+    }
+
+    fun petCat() {
+        val coins = engine.coins
+        engine.petCat()
+        afterAction(prevCoins = coins)
+    }
+
+    fun openMerchant() {
+        audioManager.playSfx("click")
+        _uiState.update { it.copy(tab = 4, toast = "Торговец разложил товар: жемчуг и янтарь — в разделе «Дела».") }
+    }
+
+    fun talkTo(npcName: String) {
+        val coins = engine.coins
+        engine.talkTo(npcName)
+        afterAction(prevCoins = coins)
+    }
+
+    fun helpNpc(npcName: String) {
+        val coins = engine.coins
+        engine.helpNpc(npcName)
+        afterAction(prevCoins = coins)
+    }
+
+    fun openGift(npcName: String) {
+        audioManager.playSfx("click")
+        val loved = _uiState.value.npcs.firstOrNull { it.name == npcName }?.lovedIds ?: emptyList()
+        _uiState.update { it.copy(giftTarget = npcName, giftTargetLoved = loved) }
+    }
+
+    /** Выбор, кому подарить предмет из сумки. */
+    fun openGiftTargetPicker(itemId: String) {
+        audioManager.playSfx("click")
+        _uiState.update { it.copy(pickTargetFor = itemId) }
+    }
+
+    fun closeGiftTargetPicker() {
+        _uiState.update { it.copy(pickTargetFor = null) }
+    }
+
+    fun giftToNpc(npcName: String) {
+        val itemId = _uiState.value.pickTargetFor
+        _uiState.update { it.copy(pickTargetFor = null) }
+        if (itemId == null) return
+        val coins = engine.coins
+        if (engine.gift(npcName, itemId)) {
+            afterAction(playClick = false, prevCoins = coins)
+        } else {
+            audioManager.playSfx("click")
+            _uiState.update { it.copy(toast = "Не получилось подарить — предмета нет в сумке.") }
+        }
+    }
+
+    fun closeGift() {
+        _uiState.update { it.copy(giftTarget = null, giftTargetLoved = emptyList()) }
+    }
+
+    fun gift(itemId: String) {
+        val target = _uiState.value.giftTarget ?: return
+        val coins = engine.coins
+        if (engine.gift(target, itemId)) {
+            _uiState.update { it.copy(giftTarget = null, giftTargetLoved = emptyList()) }
+            afterAction(prevCoins = coins)
+        } else {
+            audioManager.playSfx("click")
+            _uiState.update { it.copy(toast = "Этого предмета нет в сумке.") }
+        }
+    }
+
+    fun craft(recipeId: String) {
+        val coins = engine.coins
+        val ok = engine.craft(recipeId)
+        if (ok) audioManager.playSfx("success")
+        afterAction(playClick = !ok, prevCoins = coins)
+    }
+
+    fun fulfillRequest(index: Int) {
+        val coins = engine.coins
+        engine.fulfillRequest(index)
+        afterAction(prevCoins = coins)
+    }
+
+    fun sellItem(itemId: String) {
+        val coins = engine.coins
+        engine.sellItem(itemId)
+        afterAction(prevCoins = coins)
+    }
+
+    fun buyUpgrade(id: String) {
+        val coins = engine.coins
+        if (engine.buyUpgrade(id)) {
             audioManager.playSfx("success")
-            saveGame()
         }
-        updateJournalHint()
-        updateUiState()
+        afterAction(playClick = false, prevCoins = coins)
     }
 
-    private fun logRitual() {
-        val parts = ritual.status().map { s ->
-            val mark = if (s.done) "☑" else "☐"
-            "$mark ${s.text} (${s.current}/${s.target})"
-        }
-        val line = "Цели дня: " + parts.joinToString(" · ")
-        if (line != lastRitualLog) {
-            logMessage(line, isSystem = true)
-            lastRitualLog = line
-        }
+    fun buyMerchant(itemId: String) {
+        val coins = engine.coins
+        engine.buyFromMerchant(itemId)
+        afterAction(prevCoins = coins)
     }
 
-    private fun updateJournalHint() {
-        val hint = when {
-            _uiState.value.playerName.isEmpty() -> "Подсказка: введи имя — все жители городка его запомнят."
-            ritual.allDone() -> "Подсказка: цели дня выполнены. Можно вернуться к жителям и узнать новости."
-            else -> "Подсказка: поговори с жителями, помоги по хозяйству и узнай свежую сплетню."
+    fun advanceQuest(npcName: String) {
+        val coins = engine.coins
+        if (engine.advanceQuest(npcName)) {
+            audioManager.playSfx("success")
         }
-        val emptyHint = if (_uiState.value.journalLines.size <= 2) {
-            if (_uiState.value.journalLines.isNotEmpty())
-                "История уже началась. Здесь появятся новые события."
-            else
-                "Здесь появится история городка.\nПознакомься с жителями — и начнётся."
-        } else ""
-
-        _uiState.update {
-            it.copy(
-                journalHint = hint,
-                emptyJournalHint = emptyHint
-            )
-        }
+        afterAction(playClick = false, prevCoins = coins)
     }
 
-    private fun showRecall() {
-        recallShown = true
-        for (npc in npcsList) {
-            val evs = npc.memory.recallAboutPlayer()
-            if (evs.isNotEmpty()) {
-                logMessage("${npc.identity.npcName} вспоминает: ${evs[0].text}", isRecall = true)
-                return
-            }
-        }
+    fun claimGoals() {
+        val coins = engine.coins
+        engine.claimRitual()
+        afterAction(playClick = false, prevCoins = coins)
     }
 
-    private fun othersAt(npc: NPC, place: String): List<NPC> {
-        return npcsList.filter { it != npc && it.schedule.placeAt(clock.hour()).place == place }
+    fun toggleJournal() {
+        _uiState.update { it.copy(journalExpanded = !it.journalExpanded) }
     }
 
-    private fun npcAtHour(hour: Int): NPC {
-        for (npc in npcsList) {
-            if (npc.schedule.placeAt(hour).place != "home") {
-                return npc
-            }
-        }
-        return npcsList[0]
-    }
-
-    fun onNpcClicked(npc: NPC) {
+    fun openPuzzle() {
         audioManager.playSfx("click")
-        _uiState.update { it.copy(selectedNpc = npc) }
-        val spot = npc.schedule.placeAt(clock.hour())
-        logMessage("Ты подошёл(ла) к ${npc.identity.npcName}. Сейчас в: ${spot.place} (${spot.activity}).", isSystem = true)
-        logMessage(DialogueComposer.compose(npc, clock.day, clock.hour()))
+        _uiState.update { it.copy(isPuzzleDialogOpen = true) }
     }
 
-    fun onPlaceClicked(placeId: String) {
-        audioManager.playSfx("click")
-        val npcsHere = npcsList.filter { it.schedule.placeAt(clock.hour()).place == placeId }
-        val names = if (npcsHere.isNotEmpty()) npcsHere.joinToString(", ") { it.identity.npcName } else "никого нет"
-        logMessage("Место: $placeId. Здесь сейчас: $names.", isSystem = true)
+    fun closePuzzle() {
+        _uiState.update { it.copy(isPuzzleDialogOpen = false) }
     }
 
     fun onMusicToggle() {
-        val newMusic = !_uiState.value.isMusicEnabled
-        audioManager.setMusicEnabled(newMusic)
-        _uiState.update { it.copy(isMusicEnabled = newMusic) }
+        val newValue = !engine.musicEnabled
+        engine.musicEnabled = newValue
+        audioManager.setMusicEnabled(newValue)
         saveGame()
+        refresh(heavy = false)
     }
 
     fun openPrivacyDialog() {
@@ -366,13 +534,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun closePrivacyDialog() {
-        audioManager.playSfx("click")
         _uiState.update { it.copy(isPrivacyDialogOpen = false) }
     }
 
     fun openReportDialog() {
         audioManager.playSfx("click")
-        _uiState.update { it.copy(isReportDialogOpen = true, reportSubmittedMessage = null) }
+        _uiState.update { it.copy(isReportDialogOpen = true) }
     }
 
     fun closeReportDialog() {
@@ -383,128 +550,67 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val ok = reportService.submit(
             reason = reason,
             text = text,
-            contextInfo = mapOf("day" to clock.day.toString(), "time" to clock.timeString())
+            contextInfo = mapOf(
+                "day" to engine.clock.day.toString(),
+                "time" to "%02d:%02d".format(engine.clock.hour(), engine.clock.minute()),
+                "place" to engine.currentPlace
+            )
         )
         if (ok) {
-            val total = reportService.count()
-            logMessage("Спасибо, сообщение сохранено (всего: $total).", isHighlight = true)
-            _uiState.update { it.copy(isReportDialogOpen = false) }
+            _uiState.update { it.copy(isReportDialogOpen = false, toast = "Спасибо, сообщение сохранено локально.") }
+            audioManager.playSfx("success")
         }
     }
 
     fun resetProgress() {
-        audioManager.playSfx("click")
         saveGame.resetProgress()
-        spawnTown()
-        clock.day = 1
-        clock.totalMinutes = 8 * 60
-        inventory.items.clear()
-        ritual.resetForDay(clock.day)
-        sessionTime = 0f
-        autosaveTime = 0f
-        recallShown = false
-        lastTalkTime = -999f
-        lastRitualLog = ""
-
-        _uiState.update {
-            it.copy(
-                day = clock.day,
-                timeString = clock.timeString(),
-                hour = clock.hour(),
-                coins = 0,
-                playerName = "",
-                nameInputText = "",
-                isNameSubmitted = false,
-                journalLines = emptyList(),
-                isPrivacyDialogOpen = false,
-                selectedNpc = null,
-                npcs = npcsList.toList()
-            )
-        }
-        logMessage("Прогресс сброшен. Городок ждёт нового знакомства.", isHighlight = true)
-        updateIntro()
-        updateJournalHint()
-        updateUiState()
+        engine.newGame()
+        lastCoins = 0
+        lastLevel = 1
+        lastAchievements = 0
+        lastUpgrades = 0
+        saveGame()
+        audioManager.playSfx("success")
+        _uiState.update { it.copy(isPrivacyDialogOpen = false, tab = 0, toast = "Новая история начинается.") }
+        refresh(heavy = true)
     }
 
-    private fun logMessage(text: String, isSystem: Boolean = false, isHighlight: Boolean = false, isRecall: Boolean = false) {
-        val entry = JournalEntry(
-            id = ++nextEntryId,
-            text = text,
-            isSystem = isSystem,
-            isHighlight = isHighlight,
-            isRecall = isRecall
-        )
-        _uiState.update { current ->
-            val updated = current.journalLines.toMutableList().apply {
-                add(entry)
-                if (size > MAX_LOG_LINES) {
-                    removeAt(0)
-                }
-            }
-            current.copy(journalLines = updated)
-        }
-        updateJournalHint()
+    fun consumeToast() {
+        _uiState.update { it.copy(toast = null) }
     }
 
     fun saveGame() {
-        val state = GameSaveState(
-            player_name = _uiState.value.playerName,
-            coins = _uiState.value.coins,
-            clock = clock.toState(),
-            inventory = inventory.toState(),
-            ritual = ritual.toState(),
-            music_enabled = _uiState.value.isMusicEnabled,
-            unlocks = emptyList(),
-            npcs = npcsList.map { it.toState() }
-        )
-        saveGame.saveState(state)
+        val data = SaveCodec.encode(engine.toState())
+        saveGame.saveRaw(data)
     }
 
-    private fun loadGame() {
-        val state = saveGame.loadState() ?: return
-        clock.loadState(state.clock)
-        inventory.loadState(state.inventory)
-        ritual.loadState(state.ritual)
-
-        val pName = state.player_name
-        if (pName.isNotEmpty()) {
-            _uiState.update {
-                it.copy(
-                    playerName = pName,
-                    nameInputText = pName,
-                    isNameSubmitted = true
-                )
-            }
-        }
-
-        _uiState.update {
-            it.copy(
-                coins = state.coins,
-                isMusicEnabled = state.music_enabled
-            )
-        }
-
-        for (i in 0 until minOf(state.npcs.size, npcsList.size)) {
-            npcsList[i].loadState(state.npcs[i])
-        }
+    /** Сворачивание: останавливаем игровое время, сохраняемся. */
+    fun onAppPaused() {
+        tickerJob?.cancel()
+        tickerJob = null
+        engine.lastSeenMs = System.currentTimeMillis()
+        saveGame()
     }
 
-    private fun updateUiState() {
-        _uiState.update {
-            it.copy(
-                day = clock.day,
-                timeString = clock.timeString(),
-                hour = clock.hour(),
-                npcs = npcsList.toList(),
-                allRitualsDone = ritual.allDone()
-            )
-        }
+    /** Возврат в игру: начисляем оффлайн-заботу и снова запускаем время. */
+    fun onAppResumed() {
+        engine.onLoaded(System.currentTimeMillis())
+        refresh(heavy = true)
+        if (tickerJob == null) startTicker()
+    }
+
+    private fun loadGame(): Boolean {
+        val raw = saveGame.loadRaw() ?: return false
+        val state = SaveCodec.parse(raw.first, raw.second) ?: return false
+        engine.loadState(state)
+        if (engine.playerName.isEmpty()) return false
+        return true
     }
 
     override fun onCleared() {
         super.onCleared()
         tickerJob?.cancel()
+        engine.lastSeenMs = System.currentTimeMillis()
         saveGame()
         audioManager.release()
     }

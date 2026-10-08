@@ -10,6 +10,7 @@ val ColorTerra = Color(0xFFB85C45)
 val ColorSand = Color(0xFFD9A441)
 val ColorMint = Color(0xFF5F9B78)
 val ColorRiver = Color(0xFF6FA8D8)
+val ColorSky = Color(0xFF5B8DB8)
 val ColorGrass = Color(0xFF8FBF6F)
 val ColorBorder = Color(0xFFD9B98C)
 

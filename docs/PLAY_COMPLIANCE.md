@@ -1,17 +1,41 @@
-# PLAY_COMPLIANCE — «Пазл из Жизни»
+# PLAY_COMPLIANCE — «Пазл из Жизни» 2.0
 
-## Блокеры/шаги Play Console (ручные, вне репо)
-1. Target SDK = **36** — задан в export_presets.cfg (`gradle_build/target_sdk="36"`). Обязательно для новых приложений с 31.08.2026. ✅ в репо
-2. Формат релиза: **.AAB** (`gradle_build/export_format=1`). APK — только для локальных тестов. ✅ в репо
-3. **Play App Signing** — включён по умолчанию при первой загрузке AAB в Console (шаг Console). Upload keystore: release.keystore (в git НЕ коммитится).
-4. **App content → AI-generated content**: сейчас диалоги NPC процедурные (DialogueComposer, без LLM) → декларация «AI не используется для генерации контента». Если включим LLM-диалоги — отметить *text generation* + правила (report-кнопка, фильтры).
-5. **In-app report** — кнопка «Сообщить» открывает локальный диалог с текстом пользователя (ReportService, user://reports.json, ≤50 записей). ✅ в репо.
-6. **Data Safety**: память NPC и сейв хранятся **локально** (user://save.json, user://reports.json), не передаются на сервер → «No data collected» при текущей архитектуре. При добавлении аналитики/IAP обновить форму.
-7. Permissions: интернет не запрашивается (`permissions/internet=false`) — соответствует Data Safety «no data shared».
-8. Min SDK: по умолчанию Godot (24) — допустимо для API 36.
-9. Store listing: иконка 1024×1024, feature graphic 1024×500, ≥6 скриншотов (assets/store/), описание с хуком (docs/ASO.md).
-10. Возрастной рейтинг: 3+ / Everyone (нет насилия, нет покупок в MVP).
+## Что уже соответствует в репозитории
 
-## Сборка релиза
-- Локально: `tools/patch_local_secrets.ps1` → `godot --headless --path . --export-release "Android" build/game.aab` → `git checkout export_presets.cfg`.
-- CI: `.github/workflows/android-aab.yml` (keystore из GitHub Secrets: ANDROID_KEYSTORE_B64 / _USER / _PASSWORD).
+| Требование | Где в репо | Статус |
+|---|---|---|
+| Target SDK 36 | `app/build.gradle.kts` (`targetSdk = 36`) | ✅ |
+| Формат релиза AAB | `gradle :app:bundleRelease` | ✅ (шаг сборки) |
+| Отсутствие интернет-разрешений | `AndroidManifest.xml` (нет `uses-permission`) | ✅ |
+| In-app report | «Сообщить» (`ReportService`, ≤50 записей, ≤1000 символов) | ✅ |
+| Панель данных | «Данные» (локальное хранение, сброс прогресса) | ✅ |
+| AI-generated content | диалоги процедурные (без облачных LLM) → декларация «не используется» | ✅ |
+| Иконка приложения | `res/mipmap-*` + store-иконка | ✅ |
+| Портретная ориентация | `android:screenOrientation="portrait"` | ✅ |
+| Min SDK 26 | `minSdk = 26` | ✅ |
+| Рейтинг | 3+/Everyone: без насилия, без покупок, без рекламы | ✅ |
+
+## Data Safety
+
+- Собираемые данные: **нет**. Передаваемые данные: **нет**.
+- Локально хранится: имя игрока, прогресс, память NPC, локальные отчёты (`filesDir/save.json`, `filesDir/reports.json`).
+- Удаление данных: удаление приложения или кнопка «Сброс прогресса» в разделе «Данные».
+- Разрешения: не запрашиваются (нет INTERNET, нет доступа к файлам/контактам/геолокации).
+
+## Шаги вне репозитория (ручные)
+
+1. Upload keystore + Play App Signing: ключ создаётся командой
+   `keytool -genkeypair -keystore release.keystore -alias upload ...`; секреты — в переменных окружения/CI,
+   **не в git**. Для локальной сборки прописать в `app/build.gradle.kts` `signingConfigs.release`.
+2. `gradle :app:bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`.
+3. Play Console: создать приложение, заполнить Data Safety (см. выше), App content (AI: не используется),
+   возрастной рейтинг, загрузить AAB, описания и графику (docs/ASO.md).
+4. Внутреннее тестирование → production.
+
+## Проверки перед загрузкой
+
+```bash
+gradle :app:testDebugUnitTest           # ядро: 28 тестов
+gradle :app:assembleDebug               # APK
+aapt dump permissions app/build/outputs/apk/debug/app-debug.apk   # список разрешений (ожидается пусто)
+```

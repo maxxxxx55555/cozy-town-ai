@@ -28,3 +28,7 @@ probe*.log
 cs.txt
 cse.txt
 spd.bin
+
+# Kotlin headless harness
+app/build/
+tools/harness/out/

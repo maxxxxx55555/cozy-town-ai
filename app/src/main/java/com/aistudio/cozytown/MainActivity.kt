@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        viewModel.onAppResumed()
         if (viewModel.uiState.value.isMusicEnabled) {
             viewModel.audioManager.startMusic()
         }
@@ -33,7 +34,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        viewModel.saveGame()
+        viewModel.onAppPaused()
         viewModel.audioManager.pauseMusic()
     }
 }

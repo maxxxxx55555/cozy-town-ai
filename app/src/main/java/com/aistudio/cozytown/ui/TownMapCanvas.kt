@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.TextMeasurer
@@ -37,78 +36,151 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.cozytown.R
-import com.aistudio.cozytown.model.NPC
+import com.aistudio.cozytown.core.NpcView
 import com.aistudio.cozytown.ui.theme.ColorBorder
 import com.aistudio.cozytown.ui.theme.ColorGrass
 import com.aistudio.cozytown.ui.theme.ColorInk
 import com.aistudio.cozytown.ui.theme.ColorRiver
+import com.aistudio.cozytown.ui.theme.ColorSand
 import com.aistudio.cozytown.ui.theme.MoodAngry
 import com.aistudio.cozytown.ui.theme.MoodHappy
 import com.aistudio.cozytown.ui.theme.MoodNeutral
 import com.aistudio.cozytown.ui.theme.MoodSleepy
 
-data class PlaceDef(
+private const val MAP_W = 360f
+private const val MAP_H = 310f
+
+data class MapPlace(
     val id: String,
     val name: String,
-    val basePos: Offset,
-    val iconRes: Int
+    val x: Float,
+    val y: Float,
+    val emoji: String
 )
+
+private val MAP_PLACES = listOf(
+    MapPlace("home", "Дом", 150f, 40f, "🏠"),
+    MapPlace("пекарня", "Пекарня", 68f, 62f, "🥐"),
+    MapPlace("рынок", "Рынок", 264f, 46f, "🧺"),
+    MapPlace("мастерская", "Мастерская", 288f, 126f, "🔨"),
+    MapPlace("площадь", "Площадь", 176f, 166f, "⛲"),
+    MapPlace("таверна", "Таверна", 58f, 198f, "🍵"),
+    MapPlace("сад", "Сад", 248f, 206f, "🌱"),
+    MapPlace("причал", "Причал", 112f, 243f, "⛵"),
+    MapPlace("маяк", "Маяк", 316f, 232f, "🗼")
+)
+
+private val MAP_ROUTES = listOf(
+    "home" to "пекарня", "home" to "рынок", "home" to "площадь",
+    "пекарня" to "площадь", "рынок" to "мастерская", "мастерская" to "площадь",
+    "площадь" to "таверна", "площадь" to "сад", "сад" to "маяк",
+    "таверна" to "причал", "сад" to "причал", "площадь" to "причал"
+)
+
+/** Маленькая эмодзи-деталь на карте (городок меняется после улучшений). */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEmoji(
+    textMeasurer: TextMeasurer,
+    emoji: String,
+    x: Float,
+    y: Float,
+    sizeSp: Int
+) {
+    val style = TextStyle(fontSize = sizeSp.sp)
+    val layout = textMeasurer.measure(text = emoji, style = style)
+    drawText(
+        textMeasurer = textMeasurer,
+        text = emoji,
+        topLeft = Offset(x - layout.size.width / 2f, y - layout.size.height / 2f),
+        style = style
+    )
+}
+
+/** Место закрыто, пока не куплено соответствующее улучшение. */
+private val PLACE_UPGRADE = mapOf("сад" to "garden", "маяк" to "lighthouse")
+
+private fun isPlaceLocked(placeId: String, upgrades: List<String>): Boolean =
+    PLACE_UPGRADE[placeId]?.let { it !in upgrades } == true
+
+/** Позиция каждого NPC на карте: у своего места, веером, если их несколько. */
+private fun npcCenters(
+    npcs: List<NpcView>,
+    scaleX: Float,
+    scaleY: Float
+): Map<String, Offset> {
+    val result = mutableMapOf<String, Offset>()
+    val groups = npcs.groupBy { it.place }
+    for ((placeId, group) in groups) {
+        val place = MAP_PLACES.find { it.id == placeId } ?: MAP_PLACES[4]
+        group.forEachIndexed { rank, npc ->
+            val col = rank % 2
+            val row = rank / 2
+            val offX = (col * 34f - 17f) * scaleX
+            val offY = (row * 30f - 13f) * scaleY
+            result[npc.name] = Offset(place.x * scaleX + offX, place.y * scaleY + offY)
+        }
+    }
+    return result
+}
 
 @Composable
 fun TownMapCanvas(
-    npcs: List<NPC>,
-    hour: Int,
-    onNpcClicked: (NPC) -> Unit,
+    npcs: List<NpcView>,
+    currentPlace: String,
+    upgrades: List<String> = emptyList(),
+    onNpcClicked: (String) -> Unit,
     onPlaceClicked: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val textMeasurer = rememberTextMeasurer()
 
-    val placeBitmaps = mapOf(
-        "пекарня" to ImageBitmap.imageResource(R.drawable.bakery),
-        "мастерская" to ImageBitmap.imageResource(R.drawable.workshop),
-        "причал" to ImageBitmap.imageResource(R.drawable.pier),
-        "рынок" to ImageBitmap.imageResource(R.drawable.market),
-        "площадь" to ImageBitmap.imageResource(R.drawable.square),
-        "таверна" to ImageBitmap.imageResource(R.drawable.tavern),
-        "home" to ImageBitmap.imageResource(R.drawable.home)
-    )
+    val homeBmp = ImageBitmap.imageResource(R.drawable.home)
+    val bakeryBmp = ImageBitmap.imageResource(R.drawable.bakery)
+    val marketBmp = ImageBitmap.imageResource(R.drawable.market)
+    val workshopBmp = ImageBitmap.imageResource(R.drawable.workshop)
+    val squareBmp = ImageBitmap.imageResource(R.drawable.square)
+    val tavernBmp = ImageBitmap.imageResource(R.drawable.tavern)
+    val pierBmp = ImageBitmap.imageResource(R.drawable.pier)
+    val gardenBmp = ImageBitmap.imageResource(R.drawable.garden)
+    val lighthouseBmp = ImageBitmap.imageResource(R.drawable.lighthouse)
 
-    val npcBitmaps = mapOf(
-        "Марта" to ImageBitmap.imageResource(R.drawable.npc_marta),
-        "Борис" to ImageBitmap.imageResource(R.drawable.npc_boris),
-        "Лука" to ImageBitmap.imageResource(R.drawable.npc_luka),
-        "Аня" to ImageBitmap.imageResource(R.drawable.npc_anya)
-    )
+    val martaBmp = ImageBitmap.imageResource(R.drawable.npc_marta)
+    val borisBmp = ImageBitmap.imageResource(R.drawable.npc_boris)
+    val lukaBmp = ImageBitmap.imageResource(R.drawable.npc_luka)
+    val anyaBmp = ImageBitmap.imageResource(R.drawable.npc_anya)
+    val osipBmp = ImageBitmap.imageResource(R.drawable.npc_osip)
+    val sonyaBmp = ImageBitmap.imageResource(R.drawable.npc_sonya)
 
-    val places = remember {
-        listOf(
-            PlaceDef("home", "Дом", Offset(150f, 45f), R.drawable.home),
-            PlaceDef("пекарня", "Пекарня", Offset(85f, 65f), R.drawable.bakery),
-            PlaceDef("рынок", "Рынок", Offset(265f, 55f), R.drawable.market),
-            PlaceDef("мастерская", "Мастерская", Offset(285f, 130f), R.drawable.workshop),
-            PlaceDef("площадь", "Площадь", Offset(180f, 175f), R.drawable.square),
-            PlaceDef("таверна", "Таверна", Offset(315f, 240f), R.drawable.tavern),
-            PlaceDef("причал", "Причал", Offset(75f, 240f), R.drawable.pier)
+    val placeBitmaps = remember(
+        homeBmp, bakeryBmp, marketBmp, workshopBmp, squareBmp, tavernBmp, pierBmp, gardenBmp, lighthouseBmp
+    ) {
+        mapOf(
+            "home" to homeBmp,
+            "пекарня" to bakeryBmp,
+            "рынок" to marketBmp,
+            "мастерская" to workshopBmp,
+            "площадь" to squareBmp,
+            "таверна" to tavernBmp,
+            "причал" to pierBmp,
+            "сад" to gardenBmp,
+            "маяк" to lighthouseBmp
         )
     }
 
-    val routes = remember {
-        listOf(
-            "home" to "пекарня",
-            "home" to "рынок",
-            "пекарня" to "площадь",
-            "рынок" to "мастерская",
-            "мастерская" to "таверна",
-            "причал" to "площадь",
-            "площадь" to "таверна"
+    val npcBitmaps = remember(martaBmp, borisBmp, lukaBmp, anyaBmp, osipBmp, sonyaBmp) {
+        mapOf(
+            "Марта" to martaBmp,
+            "Борис" to borisBmp,
+            "Лука" to lukaBmp,
+            "Аня" to anyaBmp,
+            "Осип" to osipBmp,
+            "Соня" to sonyaBmp
         )
     }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(310.dp)
+            .height(300.dp)
             .clip(RoundedCornerShape(16.dp))
             .border(2.dp, ColorBorder, RoundedCornerShape(16.dp))
             .background(ColorGrass)
@@ -117,224 +189,257 @@ fun TownMapCanvas(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(npcs, hour) {
-                    detectTapGestures { tapOffset ->
-                        val w = size.width.toFloat()
-                        val h = size.height.toFloat()
-                        val scaleX = w / 360f
-                        val scaleY = h / 310f
+                .pointerInput(npcs, currentPlace, upgrades) {
+                    detectTapGestures { tap ->
+                        val scaleX = size.width / MAP_W
+                        val scaleY = size.height / MAP_H
+                        val centers = npcCenters(npcs, scaleX, scaleY)
 
-                        // Check NPC taps first
-                        for ((idx, npc) in npcs.withIndex()) {
-                            val spot = npc.schedule.placeAt(hour)
-                            val placeDef = places.find { it.id == spot.place } ?: places[0]
-                            val col = idx % 2
-                            val row = idx / 2
-                            val offX = (col * 50f - 25f) * scaleX
-                            val offY = (row * 40f - 20f) * scaleY
-                            val npcX = placeDef.basePos.x * scaleX + offX
-                            val npcY = placeDef.basePos.y * scaleY + offY
-
-                            val distSq = (tapOffset.x - npcX) * (tapOffset.x - npcX) +
-                                    (tapOffset.y - npcY) * (tapOffset.y - npcY)
-                            if (distSq < (28f * scaleX) * (28f * scaleX)) {
-                                onNpcClicked(npc)
-                                return@detectTapGestures
-                            }
+                        // сначала жители, потом места — чтобы тап по NPC не «уводил» в переход
+                        val tappedNpc = npcs.firstOrNull { npc ->
+                            val center = centers[npc.name] ?: return@firstOrNull false
+                            val dx = tap.x - center.x
+                            val dy = tap.y - center.y
+                            dx * dx + dy * dy < (30f * scaleX) * (30f * scaleX)
                         }
-
-                        // Check place taps
-                        for (place in places) {
-                            val px = place.basePos.x * scaleX
-                            val py = place.basePos.y * scaleY
-                            val distSq = (tapOffset.x - px) * (tapOffset.x - px) +
-                                    (tapOffset.y - py) * (tapOffset.y - py)
-                            if (distSq < (36f * scaleX) * (36f * scaleX)) {
-                                onPlaceClicked(place.id)
-                                return@detectTapGestures
-                            }
+                        val tappedPlace = MAP_PLACES.firstOrNull { place ->
+                            val dx = tap.x - place.x * scaleX
+                            val dy = tap.y - place.y * scaleY
+                            dx * dx + dy * dy < (34f * scaleX) * (34f * scaleX)
+                        }
+                        when {
+                            tappedNpc != null -> onNpcClicked(tappedNpc.name)
+                            tappedPlace != null -> onPlaceClicked(tappedPlace.id)
                         }
                     }
                 }
         ) {
-            val canvasW = size.width
-            val canvasH = size.height
-            val scaleX = canvasW / 360f
-            val scaleY = canvasH / 310f
+            val scaleX = size.width / MAP_W
+            val scaleY = size.height / MAP_H
+            fun pt(place: MapPlace) = Offset(place.x * scaleX, place.y * scaleY)
 
-            fun mapPoint(base: Offset): Offset {
-                return Offset(base.x * scaleX, base.y * scaleY)
-            }
-
-            // 1. Draw River at the bottom
-            val riverHeight = 65f * scaleY
+            // 1. Река
+            val riverHeight = 70f * scaleY
             drawRect(
                 color = ColorRiver,
-                topLeft = Offset(0f, canvasH - riverHeight),
-                size = Size(canvasW, riverHeight)
+                topLeft = Offset(0f, size.height - riverHeight),
+                size = Size(size.width, riverHeight)
             )
-            // Soft river wave highlight
             drawLine(
                 color = Color.White.copy(alpha = 0.35f),
-                start = Offset(0f, canvasH - riverHeight + 4f),
-                end = Offset(canvasW, canvasH - riverHeight + 4f),
+                start = Offset(0f, size.height - riverHeight + 5f),
+                end = Offset(size.width, size.height - riverHeight + 5f),
                 strokeWidth = 3f
             )
+            for (i in 0 until 5) {
+                val y = size.height - riverHeight + 22f + i * 10f
+                drawLine(
+                    color = Color.White.copy(alpha = 0.20f),
+                    start = Offset(size.width * (0.06f + 0.17f * i), y),
+                    end = Offset(size.width * (0.24f + 0.17f * i), y),
+                    strokeWidth = 2f
+                )
+            }
 
-            // 2. Draw Road paths
+            // 2. Дороги
             val pathColor = Color(0xFFC7B18E)
-            val pathStroke = 6f * scaleX
-            for (route in routes) {
-                val p1 = places.find { it.id == route.first }?.basePos ?: Offset.Zero
-                val p2 = places.find { it.id == route.second }?.basePos ?: Offset.Zero
+            for ((from, to) in MAP_ROUTES) {
+                val p1 = MAP_PLACES.find { it.id == from } ?: continue
+                val p2 = MAP_PLACES.find { it.id == to } ?: continue
                 drawLine(
                     color = pathColor,
-                    start = mapPoint(p1),
-                    end = mapPoint(p2),
-                    strokeWidth = pathStroke,
+                    start = pt(p1),
+                    end = pt(p2),
+                    strokeWidth = 7f * scaleX,
                     cap = StrokeCap.Round
                 )
             }
 
-            // 3. Draw Places
-            for (place in places) {
-                val center = mapPoint(place.basePos)
-                // Draw place marker base
-                drawCircle(
-                    color = Color(0xFF8B6C48).copy(alpha = 0.4f),
-                    radius = 16f * scaleX,
-                    center = center
-                )
-                // Draw place sprite
-                val bitmap = placeBitmaps[place.id]
-                if (bitmap != null) {
-                    val iconSize = (28f * scaleX).toInt()
-                    drawImage(
-                        image = bitmap,
-                        dstOffset = IntOffset((center.x - iconSize / 2).toInt(), (center.y - iconSize / 2).toInt()),
-                        dstSize = IntSize(iconSize, iconSize)
+            // 2.5 Декорации: городок меняется после улучшений
+            if ("lanterns" in upgrades) {
+                for ((from, to) in MAP_ROUTES) {
+                    val p1 = MAP_PLACES.find { it.id == from } ?: continue
+                    val p2 = MAP_PLACES.find { it.id == to } ?: continue
+                    val mid = Offset((pt(p1).x + pt(p2).x) / 2f, (pt(p1).y + pt(p2).y) / 2f)
+                    drawCircle(color = Color(0xFFFFE9A8), radius = 3.5f * scaleX, center = mid)
+                    drawCircle(
+                        color = Color(0xFFE8B23C).copy(alpha = 0.6f),
+                        radius = 6.5f * scaleX,
+                        center = mid,
+                        style = Stroke(width = 1.5f * scaleX)
+                    )
+                }
+            }
+            MAP_PLACES.find { it.id == "площадь" }?.let { square ->
+                val c = pt(square)
+                if ("fountain" in upgrades) {
+                    drawCircle(color = Color(0xFFBFE3F5), radius = 13f * scaleX, center = Offset(c.x, c.y + 14f * scaleY))
+                    drawCircle(
+                        color = Color(0xFF6FA8D8),
+                        radius = 15f * scaleX,
+                        center = Offset(c.x, c.y + 14f * scaleY),
+                        style = Stroke(width = 2f * scaleX)
+                    )
+                    for (i in 0 until 5) {
+                        val angle = i * 72f
+                        val rx = c.x + 15f * scaleX * kotlin.math.cos(Math.toRadians(angle.toDouble())).toFloat()
+                        val ry = c.y + 14f * scaleY + 15f * scaleX * kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat()
+                        drawCircle(color = Color.White.copy(alpha = 0.75f), radius = 2f * scaleX, center = Offset(rx, ry))
+                    }
+                }
+                if ("fair" in upgrades) drawEmoji(textMeasurer, "🎪", c.x + 22f * scaleX, c.y - 22f * scaleY, 11)
+                if ("cat" in upgrades) drawEmoji(textMeasurer, "🐈", c.x - 32f * scaleX, c.y + 24f * scaleY, 10)
+            }
+            // лавка сладостей у рынка, паром у причала, библиотека у дома, телескоп у маяка, ратуша на площади
+            MAP_PLACES.find { it.id == "рынок" }?.let { market ->
+                if ("sweet_shop" in upgrades) drawEmoji(textMeasurer, "🍬", pt(market).x + 24f * scaleX, pt(market).y + 20f * scaleY, 11)
+            }
+            MAP_PLACES.find { it.id == "причал" }?.let { pier ->
+                if ("ferry" in upgrades) drawEmoji(textMeasurer, "⛴", pt(pier).x + 26f * scaleX, pt(pier).y + 14f * scaleY, 11)
+            }
+            MAP_PLACES.find { it.id == "home" }?.let { home ->
+                if ("library" in upgrades) drawEmoji(textMeasurer, "📚", pt(home).x - 26f * scaleX, pt(home).y + 12f * scaleY, 11)
+            }
+            MAP_PLACES.find { it.id == "маяк" }?.let { lh ->
+                if ("telescope" in upgrades) drawEmoji(textMeasurer, "🔭", pt(lh).x - 22f * scaleX, pt(lh).y - 6f * scaleY, 11)
+            }
+            MAP_PLACES.find { it.id == "площадь" }?.let { square ->
+                if ("townhall" in upgrades) drawEmoji(textMeasurer, "🏛", pt(square).x + 30f * scaleX, pt(square).y + 30f * scaleY, 11)
+            }
+
+            MAP_PLACES.find { it.id == "рынок" }?.let { market ->
+                if ("flowerbeds" in upgrades) {
+                    val c = pt(market)
+                    for (i in 0 until 4) {
+                        drawCircle(
+                            color = if (i % 2 == 0) Color(0xFFE58AA8) else Color(0xFFF2C14E),
+                            radius = 3f * scaleX,
+                            center = Offset(c.x - 18f * scaleX + i * 12f * scaleX, c.y + 26f * scaleY)
+                        )
+                    }
+                }
+            }
+
+            // 3. Места
+            for (place in MAP_PLACES) {
+                val center = pt(place)
+                val isHere = place.id == currentPlace
+
+                if (isHere) {
+                    drawCircle(color = ColorSand.copy(alpha = 0.30f), radius = 22f * scaleX, center = center)
+                    drawCircle(
+                        color = ColorSand,
+                        radius = 22f * scaleX,
+                        center = center,
+                        style = Stroke(width = 3f * scaleX)
+                    )
+                } else {
+                    drawCircle(
+                        color = Color(0xFF8B6C48).copy(alpha = 0.32f),
+                        radius = 17f * scaleX,
+                        center = center
                     )
                 }
 
-                // Draw place label pill
-                val labelText = place.name
-                val textLayout = textMeasurer.measure(
-                    text = labelText,
-                    style = TextStyle(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ColorInk
+                placeBitmaps[place.id]?.let { bitmap ->
+                    val iconSize = (30f * scaleX).toInt().coerceAtLeast(12)
+                    drawImage(
+                        image = bitmap,
+                        dstOffset = IntOffset(
+                            (center.x - iconSize / 2f).toInt(),
+                            (center.y - iconSize / 2f).toInt()
+                        ),
+                        dstSize = IntSize(iconSize, iconSize),
+                        alpha = if (isPlaceLocked(place.id, upgrades)) 0.45f else 1f
                     )
-                )
-                val labelW = textLayout.size.width + 12f
-                val labelH = textLayout.size.height + 4f
-                val labelX = center.x - labelW / 2
-                val labelY = center.y + (16f * scaleY)
+                }
+                if (isPlaceLocked(place.id, upgrades)) drawEmoji(textMeasurer, "🔒", center.x, center.y, 10)
 
-                val pillPath = Path().apply {
+                val labelText = if (isHere) "• ${place.name}" else place.name
+                val style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = ColorInk)
+                val layout = textMeasurer.measure(text = labelText, style = style)
+                val labelW = layout.size.width + 10f
+                val labelH = layout.size.height + 3f
+                val labelX = center.x - labelW / 2f
+                val labelY = center.y + 14f * scaleY
+
+                val pill = Path().apply {
                     addRoundRect(
                         RoundRect(
                             rect = Rect(labelX, labelY, labelX + labelW, labelY + labelH),
-                            cornerRadius = CornerRadius(8f, 8f)
+                            cornerRadius = CornerRadius(7f, 7f)
                         )
                     )
                 }
-                drawPath(pillPath, Color(0xFFFFF8E7).copy(alpha = 0.9f))
-                drawPath(pillPath, ColorBorder, style = Stroke(width = 1f))
+                drawPath(pill, if (isHere) Color(0xFFFFF3D9) else Color(0xFFFFF8E7).copy(alpha = 0.9f))
+                drawPath(pill, if (isHere) ColorSand else ColorBorder, style = Stroke(width = 1.2f))
                 drawText(
                     textMeasurer = textMeasurer,
                     text = labelText,
-                    topLeft = Offset(labelX + 6f, labelY + 2f),
-                    style = TextStyle(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ColorInk
-                    )
+                    topLeft = Offset(labelX + 5f, labelY + 1.5f),
+                    style = style
                 )
             }
 
-            // 4. Draw NPCs at their current scheduled positions
-            for ((idx, npc) in npcs.withIndex()) {
-                val spot = npc.schedule.placeAt(hour)
-                val placeDef = places.find { it.id == spot.place } ?: places[0]
-                val col = idx % 2
-                val row = idx / 2
-                val offX = (col * 50f - 25f) * scaleX
-                val offY = (row * 38f - 19f) * scaleY
-                val npcCenter = Offset(placeDef.basePos.x * scaleX + offX, placeDef.basePos.y * scaleY + offY)
-
-                // Mood ring color
-                val moodColor = when (npc.identity.mood) {
+            // 4. NPC поверх карты
+            val centers = npcCenters(npcs, scaleX, scaleY)
+            for (npc in npcs) {
+                val center = centers[npc.name] ?: continue
+                val moodColor = when (npc.mood) {
                     "happy" -> MoodHappy
                     "angry" -> MoodAngry
                     "sleepy" -> MoodSleepy
                     else -> MoodNeutral
                 }
 
-                // Shadow
                 drawCircle(
-                    color = Color.Black.copy(alpha = 0.25f),
-                    radius = 16f * scaleX,
-                    center = Offset(npcCenter.x, npcCenter.y + 2f)
+                    color = Color.Black.copy(alpha = 0.18f),
+                    radius = 15f * scaleX,
+                    center = Offset(center.x, center.y + 3f)
                 )
-
-                // Mood outer ring
                 drawCircle(
                     color = moodColor,
-                    radius = 18f * scaleX,
-                    center = npcCenter,
-                    style = Stroke(width = 3.5f * scaleX)
+                    radius = 17f * scaleX,
+                    center = center,
+                    style = Stroke(width = 3f * scaleX)
                 )
+                drawCircle(color = Color(0xFFFFFDF8), radius = 15f * scaleX, center = center)
 
-                // Inner circle background
-                drawCircle(
-                    color = Color(0xFFFFFDF8),
-                    radius = 16f * scaleX,
-                    center = npcCenter
-                )
-
-                // Sprite
-                val npcBitmap = npcBitmaps[npc.identity.npcName]
-                if (npcBitmap != null) {
-                    val spriteSize = (26f * scaleX).toInt()
+                val sprite = npcBitmaps[npc.name]
+                if (sprite != null) {
+                    val spriteSize = (24f * scaleX).toInt().coerceAtLeast(10)
                     drawImage(
-                        image = npcBitmap,
-                        dstOffset = IntOffset((npcCenter.x - spriteSize / 2).toInt(), (npcCenter.y - spriteSize / 2).toInt()),
+                        image = sprite,
+                        dstOffset = IntOffset(
+                            (center.x - spriteSize / 2f).toInt(),
+                            (center.y - spriteSize / 2f).toInt()
+                        ),
                         dstSize = IntSize(spriteSize, spriteSize)
                     )
                 }
 
-                // Name tag
-                val nameTag = npc.identity.npcName
-                val nameLayout = textMeasurer.measure(
-                    text = nameTag,
-                    style = TextStyle(
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = ColorInk
-                    )
-                )
-                val nw = nameLayout.size.width + 10f
-                val nh = nameLayout.size.height + 4f
-                val nx = npcCenter.x - nw / 2
-                val ny = npcCenter.y - 28f * scaleY
+                val nameStyle = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = ColorInk)
+                val nameLayout = textMeasurer.measure(text = npc.name, style = nameStyle)
+                val nw = nameLayout.size.width + 8f
+                val nh = nameLayout.size.height + 3f
+                val nx = center.x - nw / 2f
+                val ny = center.y - 27f * scaleY
 
-                val tagRoundRect = RoundRect(
-                    rect = Rect(nx, ny, nx + nw, ny + nh),
-                    cornerRadius = CornerRadius(6f, 6f)
-                )
-                val tagPath = Path().apply { addRoundRect(tagRoundRect) }
-                drawPath(tagPath, Color(0xFFFFF9EE).copy(alpha = 0.95f))
-                drawPath(tagPath, moodColor, style = Stroke(width = 1.2f))
+                val tag = Path().apply {
+                    addRoundRect(
+                        RoundRect(
+                            rect = Rect(nx, ny, nx + nw, ny + nh),
+                            cornerRadius = CornerRadius(5f, 5f)
+                        )
+                    )
+                }
+                drawPath(tag, Color(0xFFFFF9EE).copy(alpha = 0.95f))
+                drawPath(tag, moodColor, style = Stroke(width = 1.2f))
                 drawText(
                     textMeasurer = textMeasurer,
-                    text = nameTag,
-                    topLeft = Offset(nx + 5f, ny + 2f),
-                    style = TextStyle(
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = ColorInk
-                    )
+                    text = npc.name,
+                    topLeft = Offset(nx + 4f, ny + 1.5f),
+                    style = nameStyle
                 )
             }
         }
