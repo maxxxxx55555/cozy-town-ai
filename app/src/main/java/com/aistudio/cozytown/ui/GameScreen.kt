@@ -21,6 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Favorite
@@ -182,6 +187,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Текущее время: $timeString"
+                }
         ) {
             Text("⏰", fontSize = 12.sp)
             Text(
@@ -201,6 +209,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Количество монет: $coins"
+                }
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
@@ -324,6 +335,16 @@ private fun NameInputRow(
             enabled = !isSubmitted,
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (!isSubmitted && inputText.trim().length >= 2) {
+                        onSubmit()
+                    }
+                }
+            ),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color(0xFFFFFDF8),
