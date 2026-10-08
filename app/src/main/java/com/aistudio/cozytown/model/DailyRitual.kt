@@ -5,6 +5,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 @Serializable
+data class GoalDef(val id: String, val text: String, val target: Int)
+
+@Serializable
 data class GoalStatus(
     val id: String,
     val text: String,
@@ -16,14 +19,18 @@ data class GoalStatus(
 @Serializable
 data class DailyRitualState(
     val day: Int = 0,
+    val goals: List<GoalDef> = emptyList(),
     val progress: Map<String, Int> = emptyMap(),
     val claimed: Boolean = false
 )
 
+/**
+ * Дневные цели. Набор целей меняется каждый день (ротация из пула),
+ * награда — монеты и опыт.
+ */
 class DailyRitual {
     companion object {
-        data class GoalDef(val id: String, val text: String, val target: Int)
-        val GOALS = listOf(
+        val DEFAULT_GOALS = listOf(
             GoalDef("talk", "Поговори с жителями", 2),
             GoalDef("kind", "Сделай добрый поступок", 1),
             GoalDef("gossip", "Узнай сплетню", 1)
@@ -32,17 +39,19 @@ class DailyRitual {
     }
 
     var day: Int = 0
+    var goals: List<GoalDef> = DEFAULT_GOALS
     val progress: MutableMap<String, Int> = mutableMapOf()
     var claimed: Boolean = false
 
-    fun resetForDay(d: Int): Boolean {
+    fun resetForDay(d: Int, newGoals: List<GoalDef> = DEFAULT_GOALS): Boolean {
         if (day == d && progress.isNotEmpty()) {
             return false
         }
         day = d
+        goals = if (newGoals.isEmpty()) DEFAULT_GOALS else newGoals
         progress.clear()
         claimed = false
-        for (g in GOALS) {
+        for (g in goals) {
             progress[g.id] = 0
         }
         return true
@@ -55,7 +64,7 @@ class DailyRitual {
     }
 
     fun status(): List<GoalStatus> {
-        return GOALS.map { g ->
+        return goals.map { g ->
             val cur = progress[g.id] ?: 0
             GoalStatus(
                 id = g.id,
@@ -82,6 +91,7 @@ class DailyRitual {
     fun toState(): DailyRitualState {
         return DailyRitualState(
             day = day,
+            goals = goals,
             progress = progress.toMap(),
             claimed = claimed
         )
@@ -90,8 +100,11 @@ class DailyRitual {
     fun loadState(state: DailyRitualState) {
         day = state.day.coerceIn(0, 9999)
         claimed = state.claimed
+        goals = if (state.goals.isEmpty()) DEFAULT_GOALS else state.goals.map {
+            GoalDef(it.id.take(24), it.text.take(80), it.target.coerceIn(1, 20))
+        }
         progress.clear()
-        for (g in GOALS) {
+        for (g in goals) {
             val v = state.progress[g.id] ?: 0
             progress[g.id] = max(v, 0)
         }
