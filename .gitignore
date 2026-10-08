@@ -1,3 +1,4 @@
+.gradle/
 # Godot 4
 .godot/
 .import/
