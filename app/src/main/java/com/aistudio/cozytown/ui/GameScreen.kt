@@ -204,7 +204,7 @@ private fun HeaderBar(
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
-                contentDescription = null,
+                contentDescription = "Монеты",
                 tint = ColorSand,
                 modifier = Modifier.size(16.dp)
             )
@@ -322,6 +322,7 @@ private fun NameInputRow(
             value = if (isSubmitted) playerName else inputText,
             onValueChange = onTextChange,
             enabled = !isSubmitted,
+            label = { Text("Имя игрока", fontSize = 11.sp, color = ColorInkLight) },
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -337,7 +338,6 @@ private fun NameInputRow(
             ),
             modifier = Modifier
                 .weight(1f)
-                .height(52.dp)
                 .testTag("name_input")
         )
 
@@ -346,17 +346,17 @@ private fun NameInputRow(
             enabled = !isSubmitted && inputText.trim().length >= 2,
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = ColorTerra,
+                containerColor = if (isSubmitted) ColorMint else ColorTerra,
                 contentColor = Color.White,
-                disabledContainerColor = Color(0xFFD3C5B5),
-                disabledContentColor = Color(0xFF81786C)
+                disabledContainerColor = if (isSubmitted) ColorMint.copy(alpha = 0.85f) else Color(0xFFD3C5B5),
+                disabledContentColor = if (isSubmitted) Color.White else Color(0xFF81786C)
             ),
             modifier = Modifier
                 .height(52.dp)
                 .testTag("name_button")
         ) {
             Text(
-                text = "Представиться",
+                text = if (isSubmitted) "✓ Знакомы" else "Представиться",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )

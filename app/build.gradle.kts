@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.secrets)
@@ -46,8 +47,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
-    kotlin {
-        jvmToolchain(21)
+    kotlinOptions {
+        jvmTarget = "21"
     }
 
     buildFeatures {
@@ -73,4 +74,5 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
 }
