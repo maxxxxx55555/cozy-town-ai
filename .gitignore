@@ -28,3 +28,7 @@ probe*.log
 cs.txt
 cse.txt
 spd.bin
+.gradle/
+gradle/wrapper/
+gradlew
+gradlew.bat
