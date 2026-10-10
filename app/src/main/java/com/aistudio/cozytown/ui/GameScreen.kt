@@ -52,6 +52,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -182,6 +185,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .clearAndSetSemantics {
+                    contentDescription = "Время в игре: $timeString"
+                }
         ) {
             Text("⏰", fontSize = 12.sp)
             Text(
@@ -201,6 +207,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .clearAndSetSemantics {
+                    contentDescription = "Монеты: $coins"
+                }
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
@@ -230,7 +239,10 @@ private fun JournalCard(
     Card(
         modifier = modifier
             .border(1.5.dp, ColorBorder, RoundedCornerShape(14.dp))
-            .testTag("journal_panel"),
+            .testTag("journal_panel")
+            .semantics {
+                contentDescription = "Журнал событий городка"
+            },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = ColorPaperCard),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -322,6 +334,7 @@ private fun NameInputRow(
             value = if (isSubmitted) playerName else inputText,
             onValueChange = onTextChange,
             enabled = !isSubmitted,
+            label = { Text("Имя персонажа") },
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -337,8 +350,11 @@ private fun NameInputRow(
             ),
             modifier = Modifier
                 .weight(1f)
-                .height(52.dp)
+                .height(56.dp)
                 .testTag("name_input")
+                .semantics {
+                    contentDescription = "Поле ввода имени персонажа"
+                }
         )
 
         Button(

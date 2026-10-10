@@ -27,6 +27,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -113,6 +115,9 @@ fun TownMapCanvas(
             .border(2.dp, ColorBorder, RoundedCornerShape(16.dp))
             .background(ColorGrass)
             .testTag("town_map")
+            .semantics {
+                contentDescription = "Интерактивная карта городка с жителями и локациями"
+            }
     ) {
         Canvas(
             modifier = Modifier
