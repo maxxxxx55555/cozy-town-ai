@@ -52,6 +52,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -182,6 +184,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Время: $timeString"
+                }
         ) {
             Text("⏰", fontSize = 12.sp)
             Text(
@@ -201,6 +206,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Монеты: $coins"
+                }
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
@@ -322,6 +330,7 @@ private fun NameInputRow(
             value = if (isSubmitted) playerName else inputText,
             onValueChange = onTextChange,
             enabled = !isSubmitted,
+            label = { Text("Ваше имя") },
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
