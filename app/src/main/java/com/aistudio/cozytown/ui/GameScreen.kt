@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
@@ -52,6 +53,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -182,6 +185,7 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics { contentDescription = "Время: $timeString" }
         ) {
             Text("⏰", fontSize = 12.sp)
             Text(
@@ -201,10 +205,11 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics { contentDescription = "Количество монет: $coins" }
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
-                contentDescription = null,
+                contentDescription = "Монеты",
                 tint = ColorSand,
                 modifier = Modifier.size(16.dp)
             )
@@ -313,53 +318,90 @@ private fun NameInputRow(
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = if (isSubmitted) playerName else inputText,
-            onValueChange = onTextChange,
-            enabled = !isSubmitted,
-            placeholder = { Text("Твоё имя…", color = ColorInkLight) },
-            singleLine = true,
+    if (isSubmitted) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .border(1.5.dp, ColorMint, RoundedCornerShape(12.dp))
+                .semantics { contentDescription = "Имя запомнено всеми NPC: $playerName" }
+                .testTag("name_submitted_card"),
             shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFFFFFDF8),
-                unfocusedContainerColor = ColorPaperCard,
-                disabledContainerColor = Color(0xFFF3ECE0),
-                focusedBorderColor = ColorTerra,
-                unfocusedBorderColor = ColorBorder,
-                focusedTextColor = ColorInk,
-                unfocusedTextColor = ColorInk,
-                disabledTextColor = ColorInk
-            ),
-            modifier = Modifier
-                .weight(1f)
-                .height(52.dp)
-                .testTag("name_input")
-        )
-
-        Button(
-            onClick = onSubmit,
-            enabled = !isSubmitted && inputText.trim().length >= 2,
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = ColorTerra,
-                contentColor = Color.White,
-                disabledContainerColor = Color(0xFFD3C5B5),
-                disabledContentColor = Color(0xFF81786C)
-            ),
-            modifier = Modifier
-                .height(52.dp)
-                .testTag("name_button")
+            colors = CardDefaults.cardColors(containerColor = ColorMint.copy(alpha = 0.15f))
         ) {
-            Text(
-                text = "Представиться",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Запомнено",
+                    tint = Color(0xFF2E7D32),
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "Все NPC знают твоё имя: $playerName",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1B5E20),
+                    maxLines = 1
+                )
+            }
+        }
+    } else {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = onTextChange,
+                enabled = true,
+                label = { Text("Имя персонажа") },
+                placeholder = { Text("Твоё имя…", color = ColorInkLight) },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFFFFFDF8),
+                    unfocusedContainerColor = ColorPaperCard,
+                    disabledContainerColor = Color(0xFFF3ECE0),
+                    focusedBorderColor = ColorTerra,
+                    unfocusedBorderColor = ColorBorder,
+                    focusedTextColor = ColorInk,
+                    unfocusedTextColor = ColorInk
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .semantics { contentDescription = "Поле ввода имени игрока" }
+                    .testTag("name_input")
             )
+
+            Button(
+                onClick = onSubmit,
+                enabled = inputText.trim().length >= 2,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ColorTerra,
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFD3C5B5),
+                    disabledContentColor = Color(0xFF81786C)
+                ),
+                modifier = Modifier
+                    .height(56.dp)
+                    .semantics { contentDescription = "Представиться жителям городка" }
+                    .testTag("name_button")
+            ) {
+                Text(
+                    text = "Представиться",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
@@ -456,7 +498,7 @@ private fun ActionButton(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = text,
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(6.dp))
