@@ -52,6 +52,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -182,6 +184,7 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "Время: $timeString" }
         ) {
             Text("⏰", fontSize = 12.sp)
             Text(
@@ -201,6 +204,7 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "Монеты: $coins" }
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
@@ -322,6 +326,7 @@ private fun NameInputRow(
             value = if (isSubmitted) playerName else inputText,
             onValueChange = onTextChange,
             enabled = !isSubmitted,
+            label = { Text("Имя") },
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -337,7 +342,7 @@ private fun NameInputRow(
             ),
             modifier = Modifier
                 .weight(1f)
-                .height(52.dp)
+                .height(60.dp)
                 .testTag("name_input")
         )
 
@@ -556,6 +561,7 @@ private fun ReportDialog(
                 OutlinedTextField(
                     value = reportText,
                     onValueChange = { if (it.length <= 1000) reportText = it },
+                    label = { Text("Описание проблемы") },
                     placeholder = { Text("Опиши, что произошло (до 1000 символов)…", fontSize = 13.sp) },
                     modifier = Modifier
                         .fillMaxWidth()
