@@ -22,12 +22,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -182,6 +186,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Текущее время: $timeString"
+                }
         ) {
             Text("⏰", fontSize = 12.sp)
             Text(
@@ -201,6 +208,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Баланс: $coins монет"
+                }
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
@@ -322,6 +332,7 @@ private fun NameInputRow(
             value = if (isSubmitted) playerName else inputText,
             onValueChange = onTextChange,
             enabled = !isSubmitted,
+            label = { Text("Имя") },
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -337,7 +348,6 @@ private fun NameInputRow(
             ),
             modifier = Modifier
                 .weight(1f)
-                .height(52.dp)
                 .testTag("name_input")
         )
 
@@ -352,14 +362,32 @@ private fun NameInputRow(
                 disabledContentColor = Color(0xFF81786C)
             ),
             modifier = Modifier
-                .height(52.dp)
+                .height(56.dp)
                 .testTag("name_button")
         ) {
-            Text(
-                text = "Представиться",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (isSubmitted) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Имя запомнено",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Запомнено",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Text(
+                        text = "Представиться",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }
@@ -425,7 +453,7 @@ private fun ActionsGrid(
             )
             ActionButton(
                 text = if (isMusicEnabled) "Музыка: вкл" else "Музыка: выкл",
-                icon = Icons.Default.PlayArrow,
+                icon = if (isMusicEnabled) Icons.Default.PlayArrow else Icons.Default.Close,
                 onClick = onToggleMusic,
                 containerColor = Color(0xFF6B8E80),
                 modifier = Modifier

@@ -1,3 +1,10 @@
+# Gradle / Android
+.gradle/
+build/
+app/build/
+.idea/
+check.log
+
 # Godot 4
 .godot/
 .import/
