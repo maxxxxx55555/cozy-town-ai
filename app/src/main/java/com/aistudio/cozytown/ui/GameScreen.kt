@@ -52,6 +52,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -182,6 +184,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Время в игре: $timeString"
+                }
         ) {
             Text("⏰", fontSize = 12.sp)
             Text(
@@ -201,6 +206,9 @@ private fun HeaderBar(
                 .background(ColorPaperCard)
                 .border(1.dp, ColorBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Количество монет: $coins"
+                }
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
@@ -230,6 +238,9 @@ private fun JournalCard(
     Card(
         modifier = modifier
             .border(1.5.dp, ColorBorder, RoundedCornerShape(14.dp))
+            .semantics {
+                contentDescription = "Уютный дневник событий городка"
+            }
             .testTag("journal_panel"),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = ColorPaperCard),
@@ -322,9 +333,17 @@ private fun NameInputRow(
             value = if (isSubmitted) playerName else inputText,
             onValueChange = onTextChange,
             enabled = !isSubmitted,
+            label = { Text("Ваше имя") },
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .weight(1f)
+                .height(60.dp)
+                .semantics {
+                    contentDescription = "Поле ввода имени игрока"
+                }
+                .testTag("name_input"),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color(0xFFFFFDF8),
                 unfocusedContainerColor = ColorPaperCard,
@@ -334,11 +353,7 @@ private fun NameInputRow(
                 focusedTextColor = ColorInk,
                 unfocusedTextColor = ColorInk,
                 disabledTextColor = ColorInk
-            ),
-            modifier = Modifier
-                .weight(1f)
-                .height(52.dp)
-                .testTag("name_input")
+            )
         )
 
         Button(
