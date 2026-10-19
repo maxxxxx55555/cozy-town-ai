@@ -204,7 +204,7 @@ private fun HeaderBar(
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
-                contentDescription = null,
+                contentDescription = "Монеты",
                 tint = ColorSand,
                 modifier = Modifier.size(16.dp)
             )
