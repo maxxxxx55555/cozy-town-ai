@@ -204,7 +204,7 @@ private fun HeaderBar(
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
-                contentDescription = null,
+                contentDescription = "Монеты",
                 tint = ColorSand,
                 modifier = Modifier.size(16.dp)
             )
@@ -456,7 +456,7 @@ private fun ActionButton(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = null, // Decorative icon alongside visible button text
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(6.dp))
