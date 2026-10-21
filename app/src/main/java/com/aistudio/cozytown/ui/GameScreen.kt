@@ -21,6 +21,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Favorite
@@ -334,6 +337,14 @@ private fun NameInputRow(
                 focusedTextColor = ColorInk,
                 unfocusedTextColor = ColorInk,
                 disabledTextColor = ColorInk
+            ),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (!isSubmitted && inputText.trim().length >= 2) {
+                        onSubmit()
+                    }
+                }
             ),
             modifier = Modifier
                 .weight(1f)
