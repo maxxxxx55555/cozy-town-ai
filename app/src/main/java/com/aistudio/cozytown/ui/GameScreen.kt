@@ -322,6 +322,7 @@ private fun NameInputRow(
             value = if (isSubmitted) playerName else inputText,
             onValueChange = onTextChange,
             enabled = !isSubmitted,
+            label = { Text("Ваше имя") },
             placeholder = { Text("Твоё имя…", color = ColorInkLight) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -333,11 +334,13 @@ private fun NameInputRow(
                 unfocusedBorderColor = ColorBorder,
                 focusedTextColor = ColorInk,
                 unfocusedTextColor = ColorInk,
-                disabledTextColor = ColorInk
+                disabledTextColor = ColorInk,
+                focusedLabelColor = ColorTerra,
+                unfocusedLabelColor = ColorInkLight
             ),
             modifier = Modifier
                 .weight(1f)
-                .height(52.dp)
+                .height(56.dp)
                 .testTag("name_input")
         )
 
@@ -352,7 +355,7 @@ private fun NameInputRow(
                 disabledContentColor = Color(0xFF81786C)
             ),
             modifier = Modifier
-                .height(52.dp)
+                .height(56.dp)
                 .testTag("name_button")
         ) {
             Text(
