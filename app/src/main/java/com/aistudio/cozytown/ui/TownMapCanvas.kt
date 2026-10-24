@@ -27,6 +27,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -105,6 +107,13 @@ fun TownMapCanvas(
         )
     }
 
+    val npcSummary = remember(npcs, hour) {
+        npcs.joinToString(", ") { npc ->
+            val place = npc.schedule.placeAt(hour).place
+            "${npc.identity.npcName} ($place)"
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -112,6 +121,9 @@ fun TownMapCanvas(
             .clip(RoundedCornerShape(16.dp))
             .border(2.dp, ColorBorder, RoundedCornerShape(16.dp))
             .background(ColorGrass)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Интерактивная карта Cozy Town. На карте: $npcSummary. Нажмите на жителя или локацию для взаимодействия."
+            }
             .testTag("town_map")
     ) {
         Canvas(
