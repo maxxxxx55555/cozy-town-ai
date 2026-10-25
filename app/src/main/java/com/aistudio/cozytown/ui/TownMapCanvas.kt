@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -105,6 +107,17 @@ fun TownMapCanvas(
         )
     }
 
+    val npcLocationsSummary = remember(npcs, hour) {
+        if (npcs.isEmpty()) {
+            "Нет персонажей"
+        } else {
+            npcs.joinToString(separator = ", ") { npc ->
+                val place = npc.schedule.placeAt(hour).place
+                "${npc.identity.npcName}: $place"
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -112,6 +125,9 @@ fun TownMapCanvas(
             .clip(RoundedCornerShape(16.dp))
             .border(2.dp, ColorBorder, RoundedCornerShape(16.dp))
             .background(ColorGrass)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Интерактивная карта городка. Персонажи на карте: $npcLocationsSummary."
+            }
             .testTag("town_map")
     ) {
         Canvas(
