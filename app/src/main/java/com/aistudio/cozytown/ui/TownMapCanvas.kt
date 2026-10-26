@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -105,6 +107,17 @@ fun TownMapCanvas(
         )
     }
 
+    val npcDetails = remember(npcs, hour) {
+        npcs.joinToString(separator = ", ") { npc ->
+            val spot = npc.schedule.placeAt(hour)
+            val placeName = places.find { it.id == spot.place }?.name ?: spot.place
+            "${npc.identity.npcName} находится в месте: $placeName"
+        }
+    }
+    val mapDescription = remember(npcDetails) {
+        "Карта городка. Жители: $npcDetails"
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -112,6 +125,9 @@ fun TownMapCanvas(
             .clip(RoundedCornerShape(16.dp))
             .border(2.dp, ColorBorder, RoundedCornerShape(16.dp))
             .background(ColorGrass)
+            .semantics(mergeDescendants = true) {
+                contentDescription = mapDescription
+            }
             .testTag("town_map")
     ) {
         Canvas(
