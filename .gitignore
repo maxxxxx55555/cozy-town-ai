@@ -1,10 +1,14 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
 # Godot 4
 .godot/
 .import/
 export.cfg
 export_presets.cfg.local
 android/build/
-build/
 *.keystore
 *.translation
 .mono/
