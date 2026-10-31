@@ -1,0 +1,3 @@
+## 2025-05-18 - Jetpack Compose Canvas and Header Badges TalkBack Accessibility
+**Learning:** Custom drawn Jetpack Compose Canvas elements are invisible to TalkBack screen readers unless wrapped with `Modifier.semantics(mergeDescendants = true)` and given a descriptive `contentDescription`. Additionally, status badges combining emojis with dynamic text (like clock/coin rows) should merge descendants and define explicit `contentDescription`s to avoid fragmented or unclear screen reader announcements.
+**Action:** Always add `Modifier.semantics(mergeDescendants = true)` with clear `contentDescription` on parent nodes for custom Compose Canvas components and multi-element status badge rows.
