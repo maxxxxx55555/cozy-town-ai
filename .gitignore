@@ -1,3 +1,7 @@
+# Gradle
+.gradle/
+app/build/
+
 # Godot 4
 .godot/
 .import/
